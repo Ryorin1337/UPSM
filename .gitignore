@@ -1,0 +1,55 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE & editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Game save files, user personal backups & locally extracted game data (Privacy & Copyright)
+*.apk
+save.xml
+decrypted_save.json
+data/phigros_data.json
+
+# Ignore json files by default, preserve typetree layout
+*.json
+!data/typetree.json
+
+# External cloned reference
+phi_ref/
+Phigrsaves/
+
+# User credentials & cloud save privacy
+*.save
+backups/

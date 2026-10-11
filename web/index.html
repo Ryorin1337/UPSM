@@ -1,0 +1,3413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Universal Phigros Save Manager (UPSM)</title>
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #121826;
+            --bg-card: rgba(20, 27, 42, 0.85);
+            --bg-input: #172033;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(0, 229, 255, 0.4);
+            --text-primary: #e6edfa;
+            --text-secondary: #8b9bb4;
+            --text-muted: #57657d;
+            --color-phi: #ffd700;
+            --color-v: #00e5ff;
+            --color-s: #00e676;
+            --color-a: #b388ff;
+            --color-b: #ffab40;
+            --color-c: #ff5252;
+            --color-f: #90a4ae;
+            --accent-cyan: #00e5ff;
+            --accent-pink: #ff007f;
+            --radius-md: 10px;
+            --radius-lg: 16px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 20px 30px;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(0, 229, 255, 0.04) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(255, 0, 127, 0.04) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+
+        /* Top Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 16px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            backdrop-filter: blur(12px);
+            margin-bottom: 20px;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .logo-badge {
+            background: linear-gradient(135deg, #00e5ff, #ff007f);
+            color: #fff;
+            font-weight: 900;
+            font-size: 20px;
+            padding: 6px 14px;
+            border-radius: 8px;
+            letter-spacing: 1px;
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);
+        }
+
+        .header-title h1 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .header-title p {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg-input);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 10px rgba(0, 229, 255, 0.25);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00b0ff, #0081cb);
+            border: none;
+            color: #fff;
+        }
+        .btn-primary:hover {
+            box-shadow: 0 0 15px rgba(0, 176, 255, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #00e676, #00b248);
+            border: none;
+            color: #0b1a10;
+            font-weight: 700;
+        }
+        .btn-success:hover {
+            box-shadow: 0 0 15px rgba(0, 230, 118, 0.4);
+        }
+
+        .btn-accent {
+            background: linear-gradient(135deg, #ff007f, #d80064);
+            border: none;
+            color: #fff;
+        }
+        .btn-accent:hover {
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.4);
+        }
+
+        /* Stats Bar */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            backdrop-filter: blur(8px);
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-val {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+
+        .stat-phi { color: var(--color-phi); text-shadow: 0 0 8px rgba(255, 215, 0, 0.5); }
+        .stat-v { color: var(--color-v); text-shadow: 0 0 8px rgba(0, 229, 255, 0.5); }
+        .stat-s { color: var(--color-s); }
+        .stat-a { color: var(--color-a); }
+
+        /* Filter & Search Bar */
+        .controls-bar {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 14px 20px;
+            margin-bottom: 24px;
+            align-items: center;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 240px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 9px 14px;
+            font-size: 14px;
+            border-radius: var(--radius-md);
+            outline: none;
+            transition: border 0.2s;
+        }
+
+        .search-box input:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 8px rgba(0, 229, 255, 0.25);
+        }
+
+        .filter-select {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 9px 12px;
+            font-size: 13px;
+            border-radius: var(--radius-md);
+            outline: none;
+            cursor: pointer;
+        }
+
+        .filter-select:focus {
+            border-color: var(--accent-cyan);
+        }
+
+        /* View toggle: card grid vs flat chart ranking */
+        .view-toggle {
+            display: inline-flex;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 2px;
+            gap: 2px;
+        }
+
+        .view-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 7px 14px;
+            font-size: 13px;
+            border-radius: 8px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .view-btn:hover { color: var(--text-primary); }
+
+        .view-btn.active {
+            background: rgba(0, 229, 255, 0.15);
+            color: var(--accent-cyan);
+            font-weight: 600;
+        }
+
+        /* Flat chart ranking: one compact row per chart, stacked vertically */
+        .chart-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .chart-row {
+            display: grid;
+            /* rank | diff | title | constant | acc | score | rks
+               The title column takes every spare pixel; the rest are fixed
+               so the numbers stay in vertical alignment down the list. */
+            grid-template-columns: 56px 48px minmax(0, 1fr) 70px 92px 110px 92px;
+            align-items: center;
+            gap: 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 9px 16px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+        }
+
+        /* Narrow screens: drop the score column before the title suffers. */
+        @media (max-width: 860px) {
+            .chart-row {
+                grid-template-columns: 44px 44px minmax(0, 1fr) 58px 80px 78px;
+            }
+            .chart-row .c-score { display: none; }
+        }
+
+        .chart-row:hover {
+            border-color: var(--border-hover);
+            background: rgba(0, 229, 255, 0.04);
+        }
+
+        .chart-row .c-rank {
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
+            font-size: 12px;
+        }
+
+        .chart-row .c-title {
+            color: var(--text-primary);
+            font-weight: 600;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .chart-row .c-artist {
+            color: var(--text-muted);
+            font-weight: 400;
+            font-size: 11px;
+            margin-left: 6px;
+        }
+
+        /* Numbers line up only in a tabular figure face. */
+        .chart-row .c-const,
+        .chart-row .c-acc,
+        .chart-row .c-score,
+        .chart-row .c-rks {
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+        }
+
+        .chart-row .c-const { color: var(--text-secondary); font-size: 12px; }
+        .chart-row .c-acc { color: var(--text-secondary); }
+        .chart-row .c-score { color: var(--text-primary); }
+        .chart-row .c-rks { color: var(--accent-cyan); font-weight: 700; }
+
+        .diff-tag {
+            display: inline-block;
+            text-align: center;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 0;
+            border-radius: 5px;
+            width: 100%;
+        }
+
+        .diff-EZ { background: rgba(0, 230, 118, 0.18); color: #00e676; }
+        .diff-HD { background: rgba(0, 229, 255, 0.18); color: #00e5ff; }
+        .diff-IN { background: rgba(255, 82, 82, 0.18); color: #ff5252; }
+        .diff-AT { background: rgba(179, 136, 255, 0.2); color: #b388ff; }
+        .diff-Legacy { background: rgba(144, 164, 174, 0.18); color: #90a4ae; }
+
+        /* Song List Grid */
+        .song-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+            gap: 18px;
+        }
+
+        .song-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            backdrop-filter: blur(10px);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .song-card:hover {
+            border-color: rgba(0, 229, 255, 0.3);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .song-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .song-title-group {
+            overflow: hidden;
+        }
+
+        .song-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #fff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .song-artist {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .song-id-pill {
+            font-size: 10px;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.04);
+            padding: 3px 8px;
+            border-radius: 4px;
+            white-space: nowrap;
+        }
+
+        /* Difficulty Tab Selector */
+        .diff-tabs {
+            display: flex;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 4px;
+            border-radius: var(--radius-md);
+        }
+
+        .diff-tab {
+            flex: 1;
+            padding: 6px 4px;
+            text-align: center;
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            border: 1px solid transparent;
+        }
+
+        .diff-tab.active {
+            background: var(--bg-input);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .diff-name-EZ { color: #00e676; }
+        .diff-name-HD { color: #2979ff; }
+        .diff-name-IN { color: #ff1744; }
+        .diff-name-AT { color: #ff007f; }
+        .diff-name-Legacy { color: #00e5ff; }
+
+        .diff-badge {
+            font-size: 10px;
+            font-weight: 800;
+            padding: 1px 5px;
+            border-radius: 4px;
+            line-height: 1.2;
+        }
+
+        .badge-phi { background: rgba(255, 215, 0, 0.2); color: #ffd700; border: 1px solid #ffd700; }
+        .badge-v_fc { background: rgba(0, 229, 255, 0.2); color: #00e5ff; border: 1px solid #00e5ff; }
+        .badge-v { background: rgba(41, 121, 255, 0.2); color: #2979ff; }
+        .badge-s { background: rgba(0, 230, 118, 0.2); color: #00e676; }
+        .badge-a { background: rgba(179, 136, 255, 0.2); color: #b388ff; }
+        .badge-b { background: rgba(255, 171, 64, 0.2); color: #ffab40; }
+        .badge-c { background: rgba(255, 82, 82, 0.2); color: #ff5252; }
+        .badge-f { background: rgba(144, 164, 174, 0.2); color: #90a4ae; }
+        .badge-none { background: rgba(255, 255, 255, 0.05); color: var(--text-muted); }
+
+        /* Diff Editor Panel */
+        .diff-editor {
+            background: rgba(15, 21, 33, 0.7);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .editor-presets {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .preset-btn {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-input);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .preset-btn:hover {
+            border-color: var(--accent-cyan);
+            color: #fff;
+        }
+
+        .editor-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1;
+        }
+
+        .input-group label {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .input-group input[type="number"], .input-group input[type="text"] {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: #fff;
+            padding: 6px 10px;
+            font-size: 13px;
+            font-family: monospace;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        .input-group input:focus {
+            border-color: var(--accent-cyan);
+        }
+
+        .fc-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-primary);
+            cursor: pointer;
+            user-select: none;
+            margin-top: 14px;
+        }
+
+        .fc-checkbox input {
+            accent-color: var(--accent-cyan);
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .score-slider {
+            width: 100%;
+            accent-color: var(--accent-cyan);
+            cursor: pointer;
+            height: 4px;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 540px;
+            padding: 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            font-size: 18px;
+            color: #fff;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        /* Analysis modal: the header and the overview bar stay put while the
+           30-row table scrolls, so the dialog never outgrows the viewport.
+           Scoped to this modal -- the other dialogs are short and unaffected. */
+        #analysis-modal .modal-content {
+            overflow: hidden;
+        }
+
+        #analysis-modal .modal-body {
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        #analysis-modal #analysis-body {
+            overflow-y: auto;
+            min-height: 0;
+            /* Room for the scrollbar so rows do not jump on overflow. */
+            padding-right: 4px;
+        }
+
+        /* Inside the dialog the score column is dropped: rank, difficulty,
+           title, constant, acc and RKS are what the ranking is about, and
+           720px is not enough to show all seven without squeezing the title. */
+        #analysis-modal .chart-row {
+            grid-template-columns: 46px 44px minmax(0, 1fr) 58px 80px 84px;
+            padding: 7px 12px;
+            gap: 10px;
+        }
+
+        #analysis-modal .chart-row .c-score { display: none; }
+
+        /* Toast Container */
+        #toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 9999;
+        }
+
+        .toast {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: var(--radius-md);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            font-size: 13px;
+            animation: slideIn 0.3s ease;
+            backdrop-filter: blur(12px);
+        }
+
+        .toast-success { border-left: 4px solid var(--color-s); }
+        .toast-error { border-left: 4px solid var(--color-c); }
+        .toast-info { border-left: 4px solid var(--accent-cyan); }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .badge-unplayed {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-muted);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="header-title">
+            <div class="logo-badge">UPSM</div>
+            <div>
+                <h1>The Universal Phigros Save Manager</h1>
+                <p id="save-status-text">正在加载存档...</p>
+            </div>
+        </div>
+        <div class="header-actions">
+            <button class="btn" style="border-color: rgba(179, 136, 255, 0.5); background: rgba(179, 136, 255, 0.12); color: #d1b3ff;" onclick="openCloudModal()">
+                ☁️ <span id="btn-cloud-status-text">个人中心 (TapTap)</span>
+            </button>
+            <button class="btn" id="btn-cloud-pull" style="display: none; border-color: rgba(0, 229, 255, 0.45); background: rgba(0, 229, 255, 0.12); color: #00e5ff; font-weight: 700;" onclick="pullCloudSaveToEditor()">
+                ☁️📥 从云端载入 (下载)
+            </button>
+            <button class="btn" id="btn-cloud-push" style="display: none; border-color: rgba(255, 0, 127, 0.45); background: rgba(255, 0, 127, 0.15); color: #ff4081; font-weight: 700;" onclick="pushEditorSaveToCloud()">
+                ☁️🚀 上传至云端
+            </button>
+            <button class="btn" style="border-color: rgba(0, 229, 255, 0.4); background: rgba(0, 229, 255, 0.1);" onclick="openApkModal()">
+                📱 <span id="btn-apk-status-text">APK 曲库导入/更新</span>
+            </button>
+            <button class="btn" id="btn-clear-db" style="display: none; color: #ff5252; border-color: rgba(255, 82, 82, 0.35); background: rgba(255, 82, 82, 0.08);" onclick="confirmClearDatabase()">
+                🗑️ 清除曲库数据
+            </button>
+            <button class="btn btn-primary" onclick="document.getElementById('file-upload').click()">📂 打开 / 上传存档</button>
+            <input type="file" id="file-upload" style="display: none;" onchange="handleFileUpload(event)" accept=".xml,.json,.save,.userdata,*">
+            <button class="btn btn-success" id="btn-export-xml" style="display: none;" onclick="exportSaveXml()" title="导出为本地 PlayerPrefs 加密 XML（云存档同样可用）">📥 下载XML</button>
+            <button class="btn" id="btn-export-json" style="display: none;" onclick="exportSaveJson()" title="导出解密后的 gameRecord + gameKey JSON（云存档同样可用）">📄 导出JSON</button>
+            <button class="btn btn-accent" id="btn-batch-ops" style="display: none;" onclick="openBatchModal()">⚡ 批量操作 & 解锁</button>
+            <button class="btn" id="btn-analysis" style="display: none; border-color: rgba(0, 230, 118, 0.45); background: rgba(0, 230, 118, 0.12); color: #00e676;" onclick="openAnalysisModal()">📊 数据分析</button>
+            <button class="btn" id="btn-currency" style="display: none;" onclick="openCurrencyModal()">💰 货币 & 课题分</button>
+            <!-- 仅在「编辑云存档」且 gameProgress 结构可识别时显示 -->
+            <button class="btn" id="btn-progress" style="display: none; border-color: rgba(255, 193, 7, 0.45); background: rgba(255, 193, 7, 0.12); color: #ffc107;" onclick="openProgressModal()">📖 剧情进度</button>
+            <!-- 原始 .save 下载已统一收进「个人中心」，此处不再重复 -->
+        </div>
+    </header>
+
+    <!-- Stats Bar -->
+    <div class="stats-grid" id="stats-grid" style="display: none;">
+        <div class="stat-card">
+            <span class="stat-label">全曲库收录</span>
+            <span class="stat-val" id="stat-total-songs">-</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">已游玩曲目</span>
+            <span class="stat-val" id="stat-played-songs">-</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">难度记录条数</span>
+            <span class="stat-val" id="stat-total-records">-</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">φ (AP) 满分</span>
+            <span class="stat-val stat-phi" id="stat-phi">-</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">V (FC) 满连</span>
+            <span class="stat-val stat-v" id="stat-v-fc">-</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">V 评级</span>
+            <span class="stat-val" id="stat-v">-</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">S 评级</span>
+            <span class="stat-val stat-s" id="stat-s">-</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">A 评级</span>
+            <span class="stat-val stat-a" id="stat-a">-</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">课题分 (Rank)</span>
+            <span class="stat-val" id="stat-rank">-</span>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="controls-bar" id="controls-bar" style="display: none;">
+        <div class="view-toggle" id="view-toggle">
+            <button class="view-btn active" id="view-btn-cards" onclick="setSongView('cards')">🎴 曲目卡片</button>
+            <button class="view-btn" id="view-btn-charts" onclick="setSongView('charts')">📋 谱面总榜</button>
+        </div>
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="🔍 搜索曲名、曲师、Song ID..." oninput="renderSongs()">
+        </div>
+        <select class="filter-select" id="filter-play-status" onchange="renderSongs()">
+            <option value="ALL">全部状态 (已玩 / 未玩)</option>
+            <option value="PLAYED">仅 已游玩</option>
+            <option value="UNPLAYED">仅 未游玩</option>
+        </select>
+        <select class="filter-select" id="filter-diff" onchange="renderSongs()">
+            <option value="ALL">全部难度</option>
+            <option value="IN">IN 难度</option>
+            <option value="AT">AT 难度</option>
+            <option value="HD">HD 难度</option>
+            <option value="EZ">EZ 难度</option>
+            <option value="Legacy">Legacy 难度</option>
+        </select>
+        <select class="filter-select" id="filter-rating" onchange="renderSongs()">
+            <option value="ALL">全部评级</option>
+            <option value="φ">仅 φ (AP)</option>
+            <option value="V (FC)">仅 V (FC)</option>
+            <option value="V">仅 V</option>
+            <option value="S">仅 S</option>
+            <option value="A">仅 A</option>
+            <option value="B">仅 B</option>
+            <option value="C">仅 C</option>
+            <option value="False">仅 False</option>
+            <option value="UNPLAYED">仅 未游玩</option>
+        </select>
+        <select class="filter-select" id="filter-sort" onchange="renderSongs()">
+            <option value="title_asc">曲名 (A-Z)</option>
+            <option value="rks_desc">单曲RKS (降序)</option>
+            <option value="rks_asc">单曲RKS (升序)</option>
+            <option value="score_desc">最高分数 (降序)</option>
+            <option value="score_asc">最高分数 (升序)</option>
+            <option value="played_first">已游玩曲目优先</option>
+            <option value="unplayed_first">未游玩曲目优先</option>
+        </select>
+        <button class="btn" onclick="openAddSongModal()">➕ 添加自定义曲目</button>
+    </div>
+
+    <!-- Song List Grid -->
+    <div class="song-grid" id="song-grid-container">
+        <!-- Dynamically rendered -->
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container"></div>
+
+    <!-- APK Onboarding & Update Modal -->
+    <div class="modal-overlay" id="apk-modal">
+        <div class="modal-content" style="max-width: 620px;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 26px;">📱</span>
+                    <div>
+                        <h2>Phigros APK 曲库解析与提取</h2>
+                        <p style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+                            从官方安装包提取全曲库与全套收藏品，支持编辑未游玩曲目
+                        </p>
+                    </div>
+                </div>
+                <button class="close-btn" onclick="closeModal('apk-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="background: rgba(0, 229, 255, 0.06); border: 1px solid rgba(0, 229, 255, 0.2); border-radius: var(--radius-md); padding: 14px 16px; font-size: 13px; line-height: 1.6; color: var(--text-primary);">
+                    <div style="font-weight: 700; color: var(--accent-cyan); margin-bottom: 4px;">💡 为什么需要 APK？（保护版权说明）</div>
+                    为保护游戏原开发商著作权，<b>本项目不内置任何游戏专有数据库文件</b>。<br>
+                    Phigros 存档本身<b>仅包含已游玩曲目的成绩与已获得的收藏品</b>。为了支持直接编辑<b>未游玩曲目各难度评级</b>，并<b>一键全解锁全部单曲、收藏品与头像</b>，请上传 Phigros 官方安装包（<code>.apk</code>），系统将在本地离线提取游戏元数据。
+                </div>
+
+                <!-- Current DB Status Card -->
+                <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <div style="font-size: 11px; color: var(--text-secondary);">当前本地数据库状态</div>
+                        <div style="font-size: 14px; font-weight: 700; color: #fff; margin-top: 2px;" id="apk-status-version">未导入 APK (请上传 APK 提取曲库)</div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="text-align: right;">
+                            <div style="font-size: 11px; color: var(--text-secondary);">已收录资源</div>
+                            <div style="font-size: 13px; font-weight: 600; color: var(--accent-cyan);" id="apk-status-counts">
+                                未收录 (请上传 APK 提取)
+                            </div>
+                        </div>
+                        <button class="btn" id="btn-modal-clear-db" style="display: none; color: #ff5252; border-color: rgba(255, 82, 82, 0.4); padding: 6px 12px; font-size: 12px;" onclick="confirmClearDatabase()">
+                            🗑️ 清除曲库数据
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Dropzone Area -->
+                <div id="apk-dropzone" style="border: 2px dashed rgba(0, 229, 255, 0.35); border-radius: var(--radius-lg); padding: 26px 20px; text-align: center; cursor: pointer; transition: all 0.2s ease; background: rgba(0, 0, 0, 0.2);"
+                     onclick="document.getElementById('apk-file-upload-input').click()"
+                     ondragover="event.preventDefault(); this.style.borderColor='var(--accent-cyan)'; this.style.background='rgba(0, 229, 255, 0.08)';"
+                     ondragleave="this.style.borderColor='rgba(0, 229, 255, 0.35)'; this.style.background='rgba(0,0,0,0.2)';"
+                     ondrop="handleApkDrop(event)">
+                    <div style="font-size: 38px; margin-bottom: 8px;">📦</div>
+                    <div style="font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px;">拖拽 Phigros APK 文件到此处</div>
+                    <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">支持任意官方版 / TapTap 最新版安装包（.apk）</p>
+                    <button class="btn btn-primary" type="button" onclick="event.stopPropagation(); document.getElementById('apk-file-upload-input').click()">
+                        📂 浏览选择 APK 文件
+                    </button>
+                    <input type="file" id="apk-file-upload-input" style="display: none;" accept=".apk" onchange="handleApkFileInput(event)">
+                </div>
+
+                <!-- Local Path Alternative -->
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="apk-local-path-input" placeholder="或输入本地 APK 文件路径 (如 D:\Phigros.apk)" style="flex: 1; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: var(--radius-md); font-size: 13px; outline: none;">
+                    <button class="btn" onclick="submitApkLocalPath()">从路径加载</button>
+                </div>
+
+                <!-- Progress Spinner -->
+                <div id="apk-progress-container" class="hidden" style="display: none; text-align: center; padding: 14px 10px; background: rgba(0, 229, 255, 0.05); border-radius: var(--radius-md); border: 1px solid rgba(0, 229, 255, 0.2);">
+                    <div style="display: inline-block; width: 28px; height: 28px; border: 3px solid rgba(0, 229, 255, 0.2); border-top-color: var(--accent-cyan); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                    <div id="apk-progress-text" style="margin-top: 8px; font-size: 13px; color: var(--accent-cyan); font-weight: 600;">正在解析 APK 内部 Unity 资产 (GameInformation)... 请稍候</div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                    <span style="font-size: 11px; color: var(--text-muted);">* 解析数据将自动保存至本地 data/phigros_data.json (已忽略上传)</span>
+                    <button class="btn" onclick="dismissApkModal()">稍后导入 (仅编辑已游玩曲目)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Batch Operations Modal -->
+    <div class="modal-overlay" id="batch-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚡ 批量操作与全解锁</h2>
+                <button class="close-btn" onclick="closeModal('batch-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label>目标难度</label>
+                    <select class="filter-select" id="batch-diff-target">
+                        <option value="ALL">全部难度 (EZ, HD, IN, AT, Legacy)</option>
+                        <option value="IN">仅 IN 难度</option>
+                        <option value="AT">仅 AT 难度</option>
+                        <option value="HD">仅 HD 难度</option>
+                        <option value="EZ">仅 EZ 难度</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>批量设置评级与分数</label>
+                    <select class="filter-select" id="batch-preset">
+                        <option value="phi">一键全 φ (AP: 1,000,000 / 100% / FC)</option>
+                        <option value="v_fc">一键全 V (FC: 985,000 / 98.5% / FC)</option>
+                        <option value="v">一键全 V (965,000 / 96.5% / Clear)</option>
+                        <option value="s">一键全 S (940,000 / 94.0%)</option>
+                        <option value="a">一键全 A (900,000 / 90.0%)</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="submitBatchRecords()">立即应用此难度评级</button>
+                <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 6px 0;">
+                <label style="font-weight: 700; color: #fff;">一键全收集 / 全解锁：</label>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label class="fc-checkbox"><input type="checkbox" id="unlock-songs" checked> 解锁全部单曲 (0key)</label>
+                    <label class="fc-checkbox"><input type="checkbox" id="unlock-collections" checked> 解锁全部收藏品 (1key & Opened)</label>
+                    <label class="fc-checkbox"><input type="checkbox" id="unlock-illustrations" checked> 解锁全部曲绘 (2key)</label>
+                    <label class="fc-checkbox"><input type="checkbox" id="unlock-avatars" checked> 解锁全部头像 (3key)</label>
+                    <label class="fc-checkbox"><input type="checkbox" id="unlock-grades" checked> 解锁全部 IN/AT 挑战限制 (Grade)</label>
+                </div>
+                <button class="btn btn-accent" onclick="submitBatchUnlock()">执行一键全解锁</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Currency Modal -->
+    <!-- ===== Analysis modal: offline RKS analytics ===== -->
+    <div class="modal-overlay" id="analysis-modal">
+        <div class="modal-content" style="max-width: 720px; max-height: 86vh;">
+            <div class="modal-header">
+                <h2>📊 数据分析 · RKS 计算器</h2>
+                <button class="close-btn" onclick="closeModal('analysis-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Overview bar: stays visible across tabs -->
+                <div id="analysis-overview" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px;">
+                    <div style="background: rgba(0,229,255,0.07); border: 1px solid rgba(0,229,255,0.2); border-radius: 10px; padding: 12px 14px;">
+                        <div style="font-size: 11px; color: var(--text-secondary);">RKS</div>
+                        <div style="font-size: 26px; font-weight: 800; color: var(--accent-cyan); line-height: 1.2;" id="an-rks">--</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px;">
+                        <div style="font-size: 11px; color: var(--text-secondary);">b27 门槛</div>
+                        <div style="font-size: 20px; font-weight: 700; color: var(--text-primary); line-height: 1.4;" id="an-threshold">--</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px;">
+                        <div style="font-size: 11px; color: var(--text-secondary);">已游玩谱面</div>
+                        <div style="font-size: 20px; font-weight: 700; color: var(--text-primary); line-height: 1.4;" id="an-coverage">--</div>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="view-toggle" style="margin-bottom: 14px; flex-wrap: wrap;">
+                    <button class="view-btn active" id="an-tab-b30" onclick="setAnalysisTab('b30')">p3 / b27</button>
+                    <button class="view-btn" id="an-tab-sug" onclick="setAnalysisTab('sug')">推分建议</button>
+                    <button class="view-btn" id="an-tab-dist" onclick="setAnalysisTab('dist')">定数分布</button>
+                    <button class="view-btn" id="an-tab-cov" onclick="setAnalysisTab('cov')">完成度</button>
+                </div>
+
+                <div id="analysis-body" style="min-height: 240px;">
+                    <div style="text-align: center; padding: 60px 20px; color: var(--text-secondary);">正在计算...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="currency-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>💰 货币与课题分设置</h2>
+                <button class="close-btn" onclick="closeModal('currency-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label>Data 货币 (NumOfMoney0 ~ NumOfMoney4)</label>
+                    <input type="number" id="money-0" placeholder="NumOfMoney0">
+                    <input type="number" id="money-1" placeholder="NumOfMoney1 (常用Data)">
+                    <input type="number" id="money-2" placeholder="NumOfMoney2">
+                    <input type="number" id="money-3" placeholder="NumOfMoney3">
+                    <input type="number" id="money-4" placeholder="NumOfMoney4">
+                </div>
+                <div class="input-group">
+                    <label>课题模式等级 (ChallengeModeRank)</label>
+                    <input type="number" id="challenge-rank-input" placeholder="例如 349, 500">
+                </div>
+                <button class="btn btn-primary" onclick="submitCurrencies()">保存货币与课题分</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Song Modal -->
+    <div class="modal-overlay" id="add-song-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>➕ 添加自定义曲目</h2>
+                <button class="close-btn" onclick="closeModal('add-song-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label>曲目 ID (格式如: 曲名.曲师.0 或 自定义ID)</label>
+                    <input type="text" id="new-song-id" placeholder="例如: DistortedFate.Sakuzyo.0">
+                </div>
+                <button class="btn btn-primary" onclick="submitAddSong()">添加曲目</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cloud Save Modal (Personal Center / Profile Page) -->
+    <!-- gameProgress (story) Modal - only shown for cloud saves with a known layout -->
+    <div class="modal-overlay" id="progress-modal">
+        <div class="modal-content" style="max-width: 720px;">
+            <div class="modal-header">
+                <div>
+                    <h2>📖 剧情进度 (gameProgress)</h2>
+                    <p style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+                        仅在编辑云存档时可用。修改后会直接打包上传至云端，上传前自动备份。
+                    </p>
+                </div>
+                <button class="modal-close" onclick="closeModal('progress-modal')">&times;</button>
+            </div>
+
+            <div id="progress-unsupported" style="display: none; background: rgba(255, 193, 7, 0.08); border: 1px solid rgba(255, 193, 7, 0.35); border-radius: 8px; padding: 14px; font-size: 13px; line-height: 1.6; color: #ffc107;">
+                <!-- filled dynamically -->
+            </div>
+
+            <div id="progress-body" style="display: none; flex-direction: column; gap: 14px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <label style="font-size: 12px; color: var(--text-secondary);">
+                        课题分 challengeModeRank
+                        <input type="number" id="prog-challengeModeRank" min="0" max="65535" style="width: 100%; margin-top: 4px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: #fff; font-size: 13px; outline: none;">
+                        <span style="font-size: 11px; color: var(--text-muted);">例如 349 = 橙色 49；552 = 彩色 52</span>
+                    </label>
+                    <label style="font-size: 12px; color: var(--text-secondary);">
+                        剧情完成标记 completed
+                        <input type="text" id="prog-completed" style="width: 100%; margin-top: 4px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: #fff; font-size: 13px; outline: none;">
+                    </label>
+                </div>
+
+                <div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Data 货币 (NumOfMoney0~4)</div>
+                    <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;">
+                        <input type="number" id="prog-money-0" min="0" placeholder="0" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: #fff; font-size: 13px; outline: none;">
+                        <input type="number" id="prog-money-1" min="0" placeholder="1" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: #fff; font-size: 13px; outline: none;">
+                        <input type="number" id="prog-money-2" min="0" placeholder="2" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: #fff; font-size: 13px; outline: none;">
+                        <input type="number" id="prog-money-3" min="0" placeholder="3" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: #fff; font-size: 13px; outline: none;">
+                        <input type="number" id="prog-money-4" min="0" placeholder="4" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: #fff; font-size: 13px; outline: none;">
+                    </div>
+                </div>
+
+                <div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">章节与开关 (仅显示当前存档结构中实际存在的字段)</div>
+                    <div id="prog-flags" style="display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px;">
+                        <!-- rendered dynamically -->
+                    </div>
+                </div>
+
+                <div style="font-size: 11px; color: var(--text-muted); line-height: 1.5;">
+                    位域字段以逗号分隔的 0/1 列表填写（例如 <code>1,1,1,1,1,1</code>），长度会自动按原结构截断或补齐。
+                </div>
+
+                <button class="btn btn-primary" style="width: 100%; padding: 11px; font-weight: 700;" onclick="saveCloudProgress()">
+                    💾 保存剧情进度并同步至云端
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="cloud-modal">
+        <div class="modal-content" style="max-width: 640px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 26px;">☁️</span>
+                    <div>
+                        <h2 id="cloud-modal-title">Phigros 个人中心 / 云存档管理</h2>
+                        <p style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;" id="cloud-modal-subtitle">
+                            TapTap / LeanCloud 官方云端连接与个人档案
+                        </p>
+                    </div>
+                </div>
+                <button class="close-btn" onclick="closeModal('cloud-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Connect Section (Shown when disconnected) -->
+                <div id="cloud-connect-section">
+                    <!-- ===== Primary path: TapTap QR login ===== -->
+                    <div style="background: rgba(0, 229, 255, 0.06); border: 1px solid rgba(0, 229, 255, 0.28); border-radius: var(--radius-md); padding: 18px; display: flex; flex-direction: column; align-items: center; gap: 12px;">
+                        <div style="font-weight: 800; color: var(--accent-cyan); font-size: 15px; display: flex; align-items: center; gap: 8px;">
+                            <span>📱</span><span>TapTap 扫码登录</span>
+                        </div>
+                        <div style="font-size: 12px; color: var(--text-secondary); text-align: center; line-height: 1.6;">
+                            使用 <b>TapTap App</b> 扫描下方二维码并确认授权，即可自动获取登录凭证。<br>
+                            无需 ADB、无需 Root、无需手动翻找 <code>.userdata</code> 文件。
+                        </div>
+
+                        <!-- QR surface: placeholder -> code -> result -->
+                        <div id="qr-container" style="width: 240px; height: 240px; background: #fff; border-radius: 10px; display: flex; align-items: center; justify-content: center; padding: 10px; position: relative;">
+                            <div id="qr-placeholder" style="text-align: center; color: #555; font-size: 13px; line-height: 1.7;">
+                                点击下方按钮<br>生成登录二维码
+                            </div>
+                            <div id="qr-image" style="display: none; width: 100%; height: 100%;"></div>
+                            <!-- Covers the code once it is no longer scannable -->
+                            <div id="qr-mask" style="display: none; position: absolute; inset: 0; background: rgba(10, 14, 24, 0.92); border-radius: 10px; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 16px;">
+                                <div id="qr-mask-text" style="color: #fff; font-size: 13px; font-weight: 600; line-height: 1.6;"></div>
+                                <button class="btn" style="font-size: 12px; padding: 6px 14px;" onclick="startQrLogin()">🔄 重新获取</button>
+                            </div>
+                        </div>
+
+                        <div id="qr-status" style="font-size: 12px; color: var(--text-secondary); min-height: 18px; text-align: center;"></div>
+
+                        <button class="btn btn-primary" id="btn-qr-login" style="padding: 10px 24px; font-weight: 700;" onclick="startQrLogin()">
+                            📷 生成登录二维码
+                        </button>
+                    </div>
+
+                    <!-- ===== Fallback: paste a token manually ===== -->
+                    <details style="margin-top: 14px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px 16px;">
+                        <summary style="cursor: pointer; font-size: 13px; color: var(--text-secondary); font-weight: 600; user-select: none;">
+                            🔑 无法扫码？手动填入 sessionToken
+                        </summary>
+                        <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+                            <div style="font-size: 12px; color: var(--text-muted); line-height: 1.7;">
+                                凭证保存在设备的私有应用目录中：
+                                <div style="background: rgba(0, 0, 0, 0.4); padding: 8px 12px; border-radius: 6px; font-family: monospace; font-size: 11px; margin: 6px 0; color: var(--accent-cyan); word-break: break-all; border: 1px solid rgba(0, 229, 255, 0.2);">
+                                    📁 /sdcard/Android/data/com.PigeonGames.Phigros/files/.userdata
+                                </div>
+                                该文件以英文圆点开头，属于隐藏文件，需在文件管理器中开启「显示隐藏文件」。
+                            </div>
+                            <div class="input-group">
+                                <label style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span>粘贴 sessionToken 或凭证文件全文：</span>
+                                    <span style="font-size: 11px; color: var(--accent-cyan); cursor: pointer;" onclick="document.getElementById('userdata-file-input').click()">
+                                        📂 或选择文件上传
+                                    </span>
+                                </label>
+                                <textarea id="cloud-token-input" rows="3" style="width: 100%; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; color: #fff; font-family: monospace; font-size: 12px; outline: none; resize: vertical;" placeholder="在此粘贴 sessionToken（例如: 08j7s1q0h...）或凭证文件的完整 JSON 内容..."></textarea>
+                                <input type="file" id="userdata-file-input" style="display: none;" accept=".userdata,.json,.txt,*" onchange="handleUserdataFile(event)">
+                            </div>
+                            <button class="btn btn-primary" id="btn-cloud-connect" onclick="connectCloudSave()">
+                                🔗 连接云端并拉取档案
+                            </button>
+                        </div>
+                    </details>
+
+                    <div style="margin-top: 12px; font-size: 11px; color: var(--text-muted); line-height: 1.7;">
+                        🔒 <b>安全保障</b>：登录凭证仅保存在本机 <code>data/credentials.json</code>，只与官方云端接口通信，绝不上报任何外部服务器。登出即删除。向云端写入前，系统会在本地 <code>backups/</code> 目录自动创建带时间戳的完整备份。
+                    </div>
+
+                    <!-- Cloud Connection Spinner / Status -->
+                    <div id="cloud-loading-indicator" style="display: none; text-align: center; padding: 10px; margin-top: 12px; background: rgba(0, 229, 255, 0.05); border-radius: 6px; border: 1px solid rgba(0, 229, 255, 0.2);">
+                        <div style="display: inline-block; width: 20px; height: 20px; border: 2px solid rgba(0, 229, 255, 0.2); border-top-color: var(--accent-cyan); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                        <span id="cloud-loading-text" style="margin-left: 8px; font-size: 12px; color: var(--accent-cyan); font-weight: 600;">正在连接 LeanCloud 云端...</span>
+                    </div>
+                </div>
+
+                <!-- Cloud Profile & Personal Center Card (shown when connected) -->
+                <div id="cloud-profile-card" style="display: none; background: rgba(18, 24, 38, 0.95); border: 1px solid rgba(0, 229, 255, 0.3); border-radius: var(--radius-md); padding: 18px; flex-direction: column; gap: 14px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                        <div>
+                            <div style="font-size: 11px; color: var(--text-secondary);">已连接玩家账号</div>
+                            <div style="font-size: 18px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+                                <span id="cloud-player-name">--</span>
+                                <span id="cloud-player-badge" style="font-size: 10px; background: rgba(0, 230, 118, 0.15); color: var(--color-s); border: 1px solid rgba(0, 230, 118, 0.4); padding: 1px 6px; border-radius: 4px;">在线</span>
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 11px; color: var(--text-secondary);">云端最近更新时间</div>
+                            <div style="font-size: 12px; color: var(--text-primary); font-family: monospace;" id="cloud-updated-at">--</div>
+                        </div>
+                    </div>
+
+                    <!-- Profile Stats Badges -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px;">
+                        <div style="background: var(--bg-input); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+                            <div style="font-size: 11px; color: var(--text-secondary);">RKS 历史评分</div>
+                            <div style="font-size: 16px; font-weight: 800; color: var(--accent-cyan); margin-top: 2px;" id="cloud-rks">--</div>
+                        </div>
+                        <div style="background: var(--bg-input); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+                            <div style="font-size: 11px; color: var(--text-secondary);">课题模式评价</div>
+                            <div style="font-size: 14px; font-weight: 800; color: #ffd700; margin-top: 2px;" id="cloud-challenge-rank">--</div>
+                        </div>
+                        <div style="background: var(--bg-input); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+                            <div style="font-size: 11px; color: var(--text-secondary);">档案数据 ID</div>
+                            <div style="font-size: 11px; color: var(--text-muted); font-family: monospace; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="cloud-object-id">--</div>
+                        </div>
+                    </div>
+
+                    <!-- Level Clear Summary Breakdown -->
+                    <div id="cloud-levels-summary" style="font-size: 12px; color: var(--text-secondary); background: rgba(0,0,0,0.25); padding: 10px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+                        <!-- Rendered dynamically -->
+                    </div>
+
+                    <!-- Action: Download & Export & Instructions -->
+                    <div style="background: rgba(0, 229, 255, 0.05); border: 1px solid rgba(0, 229, 255, 0.15); border-radius: 6px; padding: 10px 12px; font-size: 12px; line-height: 1.5; color: var(--text-secondary);">
+                        💡 <b>云存档编辑指引：</b>您可在主界面顶部操作栏点击 <b>【☁️📥 从云端载入 (下载)】</b> 将云端存档导入编辑器；完成修改后，点击 <b>【☁️🚀 上传至云端】</b> 即可一键打包上传至官方云端并自动备份。
+                    </div>
+
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="btn btn-success" style="font-size: 12px; padding: 6px 12px;" onclick="downloadCloudSaveFile()">
+                            📥 下载云存档 (.save 加密)
+                        </button>
+                        <button class="btn" style="font-size: 12px; padding: 6px 12px;" onclick="exportCloudRecordsJson()">
+                            🔓 导出成绩 JSON (gameRecord+gameKey)
+                        </button>
+                        <button class="btn" style="font-size: 12px; padding: 6px 12px;" onclick="exportCloudSaveJson()">
+                            📄 导出完整解密 JSON
+                        </button>
+                    </div>
+
+                    <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 6px 0;">
+
+                    <!-- ===== Name card: selfIntro / avatar / background ===== -->
+                    <div id="cloud-usercard-section">
+                        <div style="font-size: 13px; font-weight: 800; color: var(--accent-cyan); margin-bottom: 10px;">🪪 个人名片</div>
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <label style="font-size: 12px; color: var(--text-secondary);">
+                                个性签名 (selfIntro)
+                                <textarea id="profile-self-intro" rows="3" style="width: 100%; margin-top: 4px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: #fff; font-size: 12px; outline: none; resize: vertical;"></textarea>
+                            </label>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <label style="font-size: 12px; color: var(--text-secondary);">
+                                    佩戴头像 ID (avatar)
+                                    <input type="text" id="profile-avatar" list="profile-avatar-list" style="width: 100%; margin-top: 4px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: #fff; font-size: 12px; outline: none;">
+                                    <datalist id="profile-avatar-list"></datalist>
+                                </label>
+                                <label style="font-size: 12px; color: var(--text-secondary);">
+                                    名片背景曲绘 ID (background)
+                                    <input type="text" id="profile-background" list="profile-background-list" style="width: 100%; margin-top: 4px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: #fff; font-size: 12px; outline: none;">
+                                    <datalist id="profile-background-list"></datalist>
+                                </label>
+                            </div>
+                            <label style="font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" id="profile-show-playerid"> 在右上角显示玩家 ID
+                            </label>
+                        </div>
+                    </div>
+
+                    <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 6px 0;">
+
+                    <!-- ===== Game settings ===== -->
+                    <div id="cloud-settings-section">
+                        <div style="font-size: 13px; font-weight: 800; color: var(--accent-cyan); margin-bottom: 10px;">🎛️ 游戏设置</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <label style="font-size: 12px; color: var(--text-secondary);">
+                                谱面延迟 soundOffset (秒)
+                                <input type="number" step="0.001" id="set-soundOffset" style="width: 100%; margin-top: 4px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: #fff; font-size: 12px; outline: none;">
+                            </label>
+                            <label style="font-size: 12px; color: var(--text-secondary);">
+                                按键缩放 noteScale
+                                <input type="number" step="0.01" id="set-noteScale" style="width: 100%; margin-top: 4px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: #fff; font-size: 12px; outline: none;">
+                            </label>
+                            <label style="font-size: 12px; color: var(--text-secondary);">
+                                背景亮度 bright <span id="lbl-bright" style="color: var(--accent-cyan);"></span>
+                                <input type="range" min="0" max="1" step="0.01" id="set-bright" style="width: 100%; margin-top: 6px;" oninput="document.getElementById('lbl-bright').innerText=(+this.value).toFixed(2)">
+                            </label>
+                            <label style="font-size: 12px; color: var(--text-secondary);">
+                                音乐音量 <span id="lbl-musicVolume" style="color: var(--accent-cyan);"></span>
+                                <input type="range" min="0" max="1" step="0.01" id="set-musicVolume" style="width: 100%; margin-top: 6px;" oninput="document.getElementById('lbl-musicVolume').innerText=(+this.value).toFixed(2)">
+                            </label>
+                            <label style="font-size: 12px; color: var(--text-secondary);">
+                                界面音效音量 <span id="lbl-effectVolume" style="color: var(--accent-cyan);"></span>
+                                <input type="range" min="0" max="1" step="0.01" id="set-effectVolume" style="width: 100%; margin-top: 6px;" oninput="document.getElementById('lbl-effectVolume').innerText=(+this.value).toFixed(2)">
+                            </label>
+                            <label style="font-size: 12px; color: var(--text-secondary);">
+                                打击音效音量 <span id="lbl-hitSoundVolume" style="color: var(--accent-cyan);"></span>
+                                <input type="range" min="0" max="1" step="0.01" id="set-hitSoundVolume" style="width: 100%; margin-top: 6px;" oninput="document.getElementById('lbl-hitSoundVolume').innerText=(+this.value).toFixed(2)">
+                            </label>
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; font-size: 12px; color: var(--text-secondary);">
+                            <label style="display: flex; align-items: center; gap: 6px;"><input type="checkbox" id="set-chordSupport"> 多押辅助</label>
+                            <label style="display: flex; align-items: center; gap: 6px;"><input type="checkbox" id="set-fcAPIndicator"> FC/AP 指示器</label>
+                            <label style="display: flex; align-items: center; gap: 6px;"><input type="checkbox" id="set-enableHitSound"> 打击音效</label>
+                            <label style="display: flex; align-items: center; gap: 6px;"><input type="checkbox" id="set-lowResolutionMode"> 低分辨率模式</label>
+                        </div>
+                        <label style="font-size: 12px; color: var(--text-secondary); display: block; margin-top: 10px;">
+                            设备名称 deviceName
+                            <input type="text" id="set-deviceName" style="width: 100%; margin-top: 4px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; color: #fff; font-size: 12px; outline: none;">
+                        </label>
+                        <button class="btn btn-primary" id="btn-save-profile" style="width: 100%; margin-top: 14px; padding: 10px; font-weight: 700;" onclick="saveCloudProfile()">
+                            💾 保存名片与设置并同步至云端
+                        </button>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px; line-height: 1.5;">
+                            保存会立即打包上传至云端（上传前自动备份旧档至 backups/）。成绩、解锁与剧情进度不受影响。
+                        </div>
+                    </div>
+
+                    <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 6px 0;">
+
+                    <!-- Single Logout Button -->
+                    <button class="btn" style="color: #ff5252; border-color: rgba(255, 82, 82, 0.4); background: rgba(255, 82, 82, 0.1); width: 100%; padding: 10px; font-size: 14px; font-weight: 700;" onclick="logoutCloudSave()">
+                        🚪 登出 / 切换账号
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let allSongs = [];
+        let summaryData = {};
+        let activeDiffState = {}; // song_id -> active difficulty (EZ, HD, IN, AT, Legacy)
+
+        const DIFFICULTIES = ["EZ", "HD", "IN", "AT", "Legacy"];
+
+        function showToast(message, type = "info") {
+            const container = document.getElementById("toast-container");
+            const toast = document.createElement("div");
+            toast.className = `toast toast-${type}`;
+            toast.innerText = message;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = "0";
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).style.display = "none";
+        }
+
+        function openModal(id) {
+            document.getElementById(id).style.display = "flex";
+        }
+
+        function openApkModal() { 
+            const progressContainer = document.getElementById("apk-progress-container");
+            if (progressContainer) {
+                progressContainer.style.display = "none";
+                progressContainer.classList.add("hidden");
+            }
+            openModal("apk-modal"); 
+        }
+        function dismissApkModal() {
+            localStorage.setItem("phigros_apk_onboarded", "true");
+            closeModal("apk-modal");
+        }
+        async function confirmClearDatabase() {
+            if (!confirm("确定要清除本地已解析的 APK 曲库数据库吗？清除后可重新上传 APK 提取。")) {
+                return;
+            }
+            try {
+                showToast("正在清除本地数据库...", "info");
+                const res = await fetch("/api/clear_database", { method: "POST" });
+                const data = await res.json();
+                if (data.status === "ok") {
+                    showToast(data.message, "success");
+                    await fetchStatus();
+                    await fetchSongs();
+                } else {
+                    showToast(data.message, "error");
+                }
+            } catch (err) {
+                showToast("清除数据库失败: " + err.message, "error");
+            }
+        }
+        function openBatchModal() { openModal("batch-modal"); }
+        function openCurrencyModal() {
+            if (summaryData.money) {
+                for (let i = 0; i < 5; i++) {
+                    const el = document.getElementById(`money-${i}`);
+                    if (el) el.value = summaryData.money[`NumOfMoney${i}`] || 0;
+                }
+            }
+            if (summaryData.challenge_rank) {
+                document.getElementById("challenge-rank-input").value = summaryData.challenge_rank;
+            }
+            openModal("currency-modal");
+        }
+        function openAddSongModal() { openModal("add-song-modal"); }
+
+        // Cloud Save State & Handlers
+        let currentCloudProfile = null;
+        let currentCloudUser = null;
+        // A sessionToken is stored on the server from a previous login.
+        let serverHasSavedToken = false;
+
+        // ===== Universal save context =====
+        // isCloudSave: the editor holds a cloud-format (.save) archive,
+        // whether it was pulled from TapTap or opened from disk. That is what
+        // unlocks the raw .save download and the gameProgress editor.
+        let isCloudSave = false;
+        let progressSupported = false;
+        let progressError = null;
+        let cloudProgressCache = null;
+        // Per-field kinds declared by the server, read from the save's own
+        // structure definition rather than guessed from values.
+        let progressFieldTypes = {};
+        let progressBitsWidths = {};
+
+        /**
+         * Cloud features need the APK song catalog. When it is missing we
+         * raise the APK import dialog instead of letting the call fail.
+         * Returns true when the caller may proceed.
+         */
+        function ensureCatalogOrPromptApk() {
+            if (window.serverHasDatabase) return true;
+            showToast("云端功能需要先导入 APK 曲库数据，正在打开导入窗口...", "info");
+            openApkModal();
+            return false;
+        }
+
+        /** Handles a 428 need_apk response from any cloud endpoint. */
+        function handleNeedApk(data) {
+            if (data && data.need_apk) {
+                showToast(data.message || "请先导入 APK 曲库数据", "error");
+                openApkModal();
+                return true;
+            }
+            return false;
+        }
+
+        /**
+         * XML and JSON export are generic and stay visible for any save.
+         * The raw .save download lives in the personal center, so the only
+         * toolbar button gated on cloud context is the gameProgress editor.
+         */
+        function updateCloudSaveButtons(hasSave) {
+            const progBtn = document.getElementById("btn-progress");
+            if (progBtn) {
+                progBtn.style.display =
+                    (hasSave && isCloudSave && progressSupported) ? "inline-flex" : "none";
+            }
+        }
+
+        /**
+         * Downloads a file from an API endpoint without leaving the page.
+         *
+         * Navigating (window.location / <a download>) hands control to the
+         * browser, so when the server answers with a JSON error the page is
+         * replaced by raw JSON. Fetching into a blob keeps us here and lets
+         * the error surface as a toast.
+         */
+        async function downloadFromApi(url, fallbackFilename, loadingMsg) {
+            if (loadingMsg) showToast(loadingMsg, "info");
+            try {
+                const resp = await fetch(url);
+                const disposition = resp.headers.get("content-disposition") || "";
+                const type = (resp.headers.get("content-type") || "").toLowerCase();
+
+                // Errors are JSON without a filename; a successful JSON export
+                // always carries Content-Disposition. That is what tells the
+                // two apart, since both are application/json.
+                if (!resp.ok || (type.includes("application/json") && !disposition)) {
+                    let msg = `下载失败（HTTP ${resp.status}）`;
+                    try {
+                        const err = await resp.json();
+                        if (err && err.message) msg = err.message;
+                    } catch (e) {
+                        // Non-JSON body: keep the status-code message.
+                    }
+                    showToast(msg, "error");
+                    return false;
+                }
+
+                let filename = fallbackFilename;
+                const match = /filename="?([^"]+)"?/.exec(disposition);
+                if (match) filename = match[1];
+
+                const blob = await resp.blob();
+                const objectUrl = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = objectUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+                return true;
+            } catch (err) {
+                showToast("下载失败：" + err.message, "error");
+                return false;
+            }
+        }
+
+        function exportSaveXml() {
+            return downloadFromApi(
+                "/api/export_xml",
+                "com.PigeonGames.Phigros.v2.playerprefs.xml",
+                "正在导出 PlayerPrefs 加密 XML..."
+            );
+        }
+
+        function exportSaveJson() {
+            return downloadFromApi(
+                "/api/export_json",
+                "phigros_decrypted.json",
+                "正在导出解密 JSON..."
+            );
+        }
+
+        function exportCloudRecordsJson() {
+            return downloadFromApi(
+                "/api/cloud/export_records_json",
+                "phigros_gameRecord_gameKey.json",
+                "正在导出 gameRecord + gameKey 解密 JSON..."
+            );
+        }
+
+        // ===== Profile: name card + game settings =====
+
+        function renderDatalist(el, values) {
+            if (!el || !Array.isArray(values) || el.childElementCount) return;
+            el.innerHTML = values
+                .map(v => `<option value="${String(v).replace(/"/g, "&quot;")}">`)
+                .join("");
+        }
+
+        /**
+         * Populates the avatar / background pickers.
+         * Every ID comes from the user's own APK extraction — the program
+         * bundles no game data of its own.
+         */
+        async function fillProfileDatalists() {
+            const avatarList = document.getElementById("profile-avatar-list");
+            const bgList = document.getElementById("profile-background-list");
+            if (!avatarList && !bgList) return;
+
+            if (!window.catalogOptions) {
+                if (!window.serverHasDatabase) return;   // nothing extracted yet
+                try {
+                    const res = await fetch("/api/catalog_options");
+                    const data = await res.json();
+                    if (data.status !== "ok") return;
+                    window.catalogOptions = data;
+                } catch (err) {
+                    console.error("catalog options fetch failed", err);
+                    return;
+                }
+            }
+
+            renderDatalist(avatarList, window.catalogOptions.avatars);
+            // Name-card backgrounds are song illustrations.
+            renderDatalist(bgList, window.catalogOptions.illustrations);
+        }
+
+        function renderProfileForm(user, settings) {
+            if (user) {
+                const intro = document.getElementById("profile-self-intro");
+                const avatar = document.getElementById("profile-avatar");
+                const bg = document.getElementById("profile-background");
+                const showId = document.getElementById("profile-show-playerid");
+                if (intro) intro.value = user.selfIntro || "";
+                if (avatar) avatar.value = user.avatar || "";
+                if (bg) bg.value = user.background || "";
+                if (showId) showId.checked = !!user.showPlayerId;
+            }
+            if (settings) {
+                ["soundOffset", "noteScale", "bright", "musicVolume", "effectVolume", "hitSoundVolume"]
+                    .forEach(k => {
+                        const el = document.getElementById("set-" + k);
+                        if (el && settings[k] !== undefined && settings[k] !== null) {
+                            el.value = settings[k];
+                            const lbl = document.getElementById("lbl-" + k);
+                            if (lbl) lbl.innerText = Number(settings[k]).toFixed(2);
+                        }
+                    });
+                ["chordSupport", "fcAPIndicator", "enableHitSound", "lowResolutionMode"].forEach(k => {
+                    const el = document.getElementById("set-" + k);
+                    if (el) el.checked = !!settings[k];
+                });
+                const dev = document.getElementById("set-deviceName");
+                if (dev) dev.value = settings.deviceName || "";
+            }
+            fillProfileDatalists();
+        }
+
+        async function loadCloudProfile() {
+            try {
+                const res = await fetch("/api/cloud/profile");
+                const data = await res.json();
+                if (handleNeedApk(data)) return;
+                if (data.status === "ok") renderProfileForm(data.user, data.settings);
+            } catch (err) {
+                console.error("loadCloudProfile failed", err);
+            }
+        }
+
+        async function saveCloudProfile() {
+            if (!ensureCatalogOrPromptApk()) return;
+            if (!confirm("确定保存个人名片与游戏设置并上传至云端吗？\n\n上传前会自动备份云端旧档至 backups/ 目录。")) return;
+
+            const num = id => {
+                const el = document.getElementById(id);
+                return (el && el.value !== "") ? Number(el.value) : undefined;
+            };
+            const chk = id => {
+                const el = document.getElementById(id);
+                return el ? el.checked : undefined;
+            };
+
+            const payload = {
+                upload: true,
+                user: {
+                    selfIntro: document.getElementById("profile-self-intro").value,
+                    avatar: document.getElementById("profile-avatar").value,
+                    background: document.getElementById("profile-background").value,
+                    showPlayerId: chk("profile-show-playerid")
+                },
+                settings: {
+                    soundOffset: num("set-soundOffset"),
+                    noteScale: num("set-noteScale"),
+                    bright: num("set-bright"),
+                    musicVolume: num("set-musicVolume"),
+                    effectVolume: num("set-effectVolume"),
+                    hitSoundVolume: num("set-hitSoundVolume"),
+                    chordSupport: chk("set-chordSupport"),
+                    fcAPIndicator: chk("set-fcAPIndicator"),
+                    enableHitSound: chk("set-enableHitSound"),
+                    lowResolutionMode: chk("set-lowResolutionMode"),
+                    deviceName: document.getElementById("set-deviceName").value
+                }
+            };
+            Object.keys(payload.settings).forEach(k => {
+                if (payload.settings[k] === undefined) delete payload.settings[k];
+            });
+
+            const btn = document.getElementById("btn-save-profile");
+            if (btn) { btn.disabled = true; btn.innerText = "\u23F3 正在上传..."; }
+            try {
+                const res = await fetch("/api/cloud/profile", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (handleNeedApk(data)) return;
+                if (data.status === "ok") {
+                    showToast(data.message || "个人资料已同步至云端", "success");
+                    renderProfileForm(data.user, data.settings);
+                } else {
+                    showToast(data.message || "保存失败", "error");
+                }
+            } catch (err) {
+                showToast("保存个人资料异常: " + err.message, "error");
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerText = "\u{1F4BE} 保存名片与设置并同步至云端"; }
+            }
+        }
+
+        // ===== gameProgress (story) =====
+
+        const PROGRESS_FIELD_LABELS = {
+            isFirstRun: "首次运行",
+            legacyChapterFinished: "旧章节已完成",
+            alreadyShowCollectionTip: "已显示收藏品提示",
+            alreadyShowAutoUnlockINTip: "已显示自动解锁 IN 提示",
+            completed: "剧情完成标记",
+            songUpdateInfo: "曲目更新信息",
+            unlockFlagOfSpasmodic: "Spasmodic 解锁",
+            unlockFlagOfIgallta: "Igallta 解锁",
+            unlockFlagOfRrharil: "Rrhar'il 解锁",
+            flagOfSongRecordKey: "IN 达 S 解锁 AT",
+            randomVersionUnlocked: "Random 切片解锁",
+            chapter8UnlockBegin: "第八章 入场",
+            chapter8UnlockSecondPhase: "第八章 第二阶段",
+            chapter8Passed: "第八章 通过",
+            chapter8SongUnlocked: "第八章 曲目解锁",
+            flagOfSongRecordKeyTakumi: "第四章 Takumi AT 解锁"
+        };
+
+        // Rendered by their own dedicated inputs in the modal.
+        const PROGRESS_HANDLED_SEPARATELY = ["challengeModeRank", "money", "completed"];
+
+        function progressRowHtml(label, field, inputHtml) {
+            return `
+                <span style="font-size: 12px; color: var(--text-secondary); flex: 1;">${label}
+                    <code style="color: var(--text-muted); font-size: 10px;">${field}</code>
+                </span>${inputHtml}`;
+        }
+
+        /** Bits fields arrive as the string "[1, 0, 1]"; normalise to an array. */
+        function parseBitList(value) {
+            if (Array.isArray(value)) return value.map(b => (Number(b) ? 1 : 0));
+            if (typeof value === "string") {
+                try {
+                    const parsed = JSON.parse(value.replace(/'/g, '"'));
+                    if (Array.isArray(parsed)) return parsed.map(b => (Number(b) ? 1 : 0));
+                } catch (e) { /* fall through */ }
+            }
+            return [];
+        }
+
+        function renderProgressForm(progress, fieldTypes, bitsWidths) {
+            cloudProgressCache = progress;
+            progressFieldTypes = fieldTypes || {};
+            progressBitsWidths = bitsWidths || {};
+
+            const rank = document.getElementById("prog-challengeModeRank");
+            if (rank) rank.value = progress.challengeModeRank ?? 0;
+            const completed = document.getElementById("prog-completed");
+            if (completed) completed.value = progress.completed ?? "";
+
+            const money = progress.money || [];
+            for (let i = 0; i < 5; i++) {
+                const el = document.getElementById("prog-money-" + i);
+                if (el) el.value = money[i] ?? 0;
+            }
+
+            const container = document.getElementById("prog-flags");
+            if (!container) return;
+            container.innerHTML = "";
+
+            const inputStyle = "background: rgba(0,0,0,0.35); border: 1px solid var(--border-color); border-radius: 5px; padding: 5px 8px; color: #fff; font-size: 12px; outline: none;";
+
+            // Only fields actually present in THIS save are rendered, and each
+            // is rendered as the kind the structure says it is — so a future
+            // layout describes itself without any frontend change.
+            Object.keys(progress).forEach(field => {
+                if (PROGRESS_HANDLED_SEPARATELY.includes(field)) return;
+                const value = progress[field];
+                const kind = progressFieldTypes[field] || "text";
+                const label = PROGRESS_FIELD_LABELS[field] || field;
+                const row = document.createElement("div");
+                row.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0;";
+
+                if (kind === "bits") {
+                    const bits = parseBitList(value);
+                    const width = progressBitsWidths[field] || bits.length;
+                    row.innerHTML = progressRowHtml(label, field, `
+                        <input type="text" data-progress-field="${field}" data-progress-kind="bits"
+                               value="${bits.join(",")}" title="固定 ${width} 位，多余会被截断"
+                               style="width: 150px; font-family: monospace; ${inputStyle}">
+                        <button class="btn" style="font-size: 11px; padding: 4px 8px;"
+                                onclick="this.previousElementSibling.value='${Array(width).fill(1).join(",")}'">全开</button>`);
+                } else if (kind === "bit") {
+                    row.innerHTML = progressRowHtml(label, field,
+                        `<input type="checkbox" data-progress-field="${field}" data-progress-kind="bit" ${Number(value) ? "checked" : ""}>`);
+                } else if (kind === "int" || kind === "float") {
+                    const step = kind === "float" ? ' step="0.01"' : "";
+                    row.innerHTML = progressRowHtml(label, field,
+                        `<input type="number"${step} data-progress-field="${field}" data-progress-kind="${kind}" value="${value ?? 0}" style="width: 110px; ${inputStyle}">`);
+                } else {
+                    const safe = String(value ?? "").replace(/"/g, "&quot;");
+                    row.innerHTML = progressRowHtml(label, field,
+                        `<input type="text" data-progress-field="${field}" data-progress-kind="text" value="${safe}" style="width: 150px; ${inputStyle}">`);
+                }
+                container.appendChild(row);
+            });
+        }
+
+        async function openProgressModal() {
+            if (!ensureCatalogOrPromptApk()) return;
+            openModal("progress-modal");
+            const body = document.getElementById("progress-body");
+            const unsupported = document.getElementById("progress-unsupported");
+            body.style.display = "none";
+            unsupported.style.display = "none";
+
+            try {
+                const res = await fetch("/api/cloud/progress");
+                const data = await res.json();
+                if (handleNeedApk(data)) { closeModal("progress-modal"); return; }
+
+                if (data.status === "ok" && data.supported) {
+                    renderProgressForm(data.progress || {}, data.field_types, data.bits_widths);
+                    body.style.display = "flex";
+                } else {
+                    // Unknown layout: the story moved ahead of this build.
+                    // Explain, hide the editor, and keep the entry untouched.
+                    unsupported.innerHTML =
+                        "\u26A0\uFE0F <b>剧情进度编辑不可用</b><br>" +
+                        (data.message || data.progress_error || "gameProgress 结构无法识别");
+                    unsupported.style.display = "block";
+                    progressSupported = false;
+                    updateCloudSaveButtons(true);
+                }
+            } catch (err) {
+                unsupported.innerHTML = "\u26A0\uFE0F 读取剧情进度失败: " + err.message;
+                unsupported.style.display = "block";
+            }
+        }
+
+        async function saveCloudProgress() {
+            if (!confirm("确定保存剧情进度并上传至云端吗？\n\n上传前会自动备份云端旧档至 backups/ 目录。")) return;
+
+            const progress = {
+                challengeModeRank: Number(document.getElementById("prog-challengeModeRank").value || 0),
+                completed: document.getElementById("prog-completed").value,
+                money: [0, 1, 2, 3, 4].map(i => Number(document.getElementById("prog-money-" + i).value || 0))
+            };
+
+            document.querySelectorAll("[data-progress-field]").forEach(el => {
+                const field = el.getAttribute("data-progress-field");
+                const kind = el.getAttribute("data-progress-kind");
+                if (kind === "bit") {
+                    progress[field] = el.checked ? 1 : 0;
+                } else if (kind === "int") {
+                    progress[field] = Math.round(Number(el.value || 0));
+                } else if (kind === "float") {
+                    progress[field] = Number(el.value || 0);
+                } else if (kind === "bits") {
+                    progress[field] = el.value.split(",")
+                        .map(x => x.trim())
+                        .filter(x => x !== "")
+                        .map(x => (Number(x) ? 1 : 0));
+                } else {
+                    progress[field] = el.value;
+                }
+            });
+
+            try {
+                const res = await fetch("/api/cloud/progress", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ upload: true, progress })
+                });
+                const data = await res.json();
+                if (handleNeedApk(data)) return;
+                if (data.status === "ok") {
+                    showToast(data.message || "剧情进度已同步至云端", "success");
+                    if (data.progress) renderProgressForm(data.progress, data.field_types, data.bits_widths);
+                    closeModal("progress-modal");
+                } else {
+                    showToast(data.message || "保存失败", "error");
+                }
+            } catch (err) {
+                showToast("保存剧情进度异常: " + err.message, "error");
+            }
+        }
+
+        // ===== TapTap QR login =====
+        // The server owns the device code and the credential; the browser
+        // only renders the code and polls for approval.
+        let qrPollTimer = null;
+        let qrExpiryTimer = null;
+        let qrDeviceCode = null;
+
+        function stopQrPolling() {
+            if (qrPollTimer) { clearInterval(qrPollTimer); qrPollTimer = null; }
+            if (qrExpiryTimer) { clearTimeout(qrExpiryTimer); qrExpiryTimer = null; }
+            qrDeviceCode = null;
+        }
+
+        function resetQrSurface() {
+            const placeholder = document.getElementById("qr-placeholder");
+            const image = document.getElementById("qr-image");
+            const mask = document.getElementById("qr-mask");
+            const status = document.getElementById("qr-status");
+            if (placeholder) placeholder.style.display = "block";
+            if (image) { image.style.display = "none"; image.innerHTML = ""; }
+            if (mask) mask.style.display = "none";
+            if (status) status.innerText = "";
+        }
+
+        /** Covers the QR code once it can no longer be scanned. */
+        function maskQrSurface(text) {
+            const mask = document.getElementById("qr-mask");
+            const maskText = document.getElementById("qr-mask-text");
+            if (maskText) maskText.innerText = text;
+            if (mask) mask.style.display = "flex";
+        }
+
+        function setQrStatus(text, color) {
+            const status = document.getElementById("qr-status");
+            if (status) {
+                status.innerText = text;
+                status.style.color = color || "var(--text-secondary)";
+            }
+        }
+
+        async function startQrLogin() {
+            stopQrPolling();
+            resetQrSurface();
+
+            const btn = document.getElementById("btn-qr-login");
+            if (btn) { btn.disabled = true; btn.innerText = "⏳ 正在获取二维码..."; }
+            setQrStatus("正在向 TapTap 请求登录二维码...");
+
+            try {
+                const res = await fetch("/api/cloud/qr_start", { method: "POST" });
+                const data = await res.json();
+                if (data.status !== "ok") {
+                    setQrStatus(data.message || "获取二维码失败", "#ff5252");
+                    showToast(data.message || "获取二维码失败", "error");
+                    return;
+                }
+
+                qrDeviceCode = data.device_code;
+                const placeholder = document.getElementById("qr-placeholder");
+                const image = document.getElementById("qr-image");
+                if (placeholder) placeholder.style.display = "none";
+                if (image) {
+                    // Inline SVG from the server: no image backend needed.
+                    image.innerHTML = data.qrcode_svg;
+                    const svg = image.querySelector("svg");
+                    if (svg) {
+                        svg.setAttribute("width", "100%");
+                        svg.setAttribute("height", "100%");
+                        svg.style.display = "block";
+                    }
+                    image.style.display = "block";
+                }
+
+                setQrStatus("请使用 TapTap App 扫描二维码并确认授权...", "var(--accent-cyan)");
+                if (btn) btn.innerText = "🔄 刷新二维码";
+
+                // Poll at the cadence TapTap asks for, and stop once the code
+                // has expired rather than hammering a dead session.
+                const intervalMs = Math.max(2, Number(data.interval) || 5) * 1000;
+                qrPollTimer = setInterval(() => pollQrLogin(), intervalMs);
+
+                const expiresMs = (Number(data.expires_in) || 300) * 1000;
+                qrExpiryTimer = setTimeout(() => {
+                    stopQrPolling();
+                    maskQrSurface("二维码已过期\n请重新获取");
+                    setQrStatus("二维码已过期。", "#ffc107");
+                }, expiresMs);
+            } catch (err) {
+                setQrStatus("获取二维码异常: " + err.message, "#ff5252");
+                showToast("获取二维码异常: " + err.message, "error");
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        async function pollQrLogin() {
+            if (!qrDeviceCode) return;
+            try {
+                const res = await fetch("/api/cloud/qr_poll", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ device_code: qrDeviceCode })
+                });
+                const data = await res.json();
+
+                if (data.state === "pending") return;   // keep waiting
+
+                stopQrPolling();
+
+                if (data.state === "ok") {
+                    maskQrSurface("✅ 登录成功");
+                    setQrStatus(data.message || "登录成功！", "#4caf50");
+                    showToast(data.message || "扫码登录成功！", "success");
+                    currentCloudUser = data.user;
+                    currentCloudProfile = data.selected_profile;
+                    await onCloudConnected(data);
+                    return;
+                }
+
+                if (data.state === "denied") {
+                    maskQrSurface("已拒绝登录\n可重新获取二维码");
+                    setQrStatus(data.message || "你在 TapTap 中拒绝了登录。", "#ff5252");
+                } else if (data.state === "expired") {
+                    maskQrSurface("二维码已过期\n请重新获取");
+                    setQrStatus(data.message || "二维码已过期。", "#ffc107");
+                } else {
+                    setQrStatus(data.message || "登录失败。", "#ff5252");
+                    showToast(data.message || "扫码登录失败", "error");
+                }
+            } catch (err) {
+                // A single failed poll is not fatal; the interval will retry.
+                console.error("QR poll failed", err);
+            }
+        }
+
+        async function openCloudModal() {
+            openModal("cloud-modal");
+
+            // The name card and settings live in this modal, so fill them from
+            // whatever save is loaded. Silent no-op when nothing is loaded yet.
+            syncProfileSections();
+
+            // Show the QR panel only when we genuinely have no session.
+            await ensureCloudSession();
+        }
+
+        /**
+         * Makes the modal reflect the server's actual login state.
+         *
+         * The server reconnects with the saved sessionToken on startup, but
+         * the page is reloaded fresh and has rendered no profile yet — so
+         * without this the QR panel showed even while already logged in.
+         * Three cases: live session, saved-but-not-connected (reconnect), or
+         * genuinely logged out (show the QR).
+         */
+        async function ensureCloudSession() {
+            try {
+                const resp = await fetch("/api/status");
+                const data = await resp.json();
+                const cs = (data && data.cloud_status) || {};
+
+                if (cs.is_connected && cs.user) {
+                    currentCloudUser = cs.user;
+                    currentCloudProfile = cs.selected_profile;
+                    renderCloudProfile({ user: cs.user, selected_profile: cs.selected_profile });
+                    return true;
+                }
+
+                if (cs.has_saved_token) {
+                    // A credential exists but no live client — typically the
+                    // startup reconnect failed or has not happened yet.
+                    setQrStatus("正在使用已保存的登录凭证重连...", "var(--accent-cyan)");
+                    const r = await fetch("/api/cloud/connect", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: "{}"
+                    });
+                    const d = await r.json();
+                    if (d.status === "ok") {
+                        await onCloudConnected(d);
+                        showToast("已使用保存的登录凭证自动重连", "success");
+                        return true;
+                    }
+                    showToast(d.message || "保存的登录凭证已失效，请重新扫码登录", "error");
+                    setQrStatus("登录凭证已失效，请重新扫码登录", "#ff4081");
+                }
+            } catch (err) {
+                console.error("Cloud session check failed", err);
+            }
+
+            // Fall through: no usable session, make sure the login panel shows.
+            const connectSection = document.getElementById("cloud-connect-section");
+            if (connectSection) connectSection.style.display = "block";
+            const profileCard = document.getElementById("cloud-profile-card");
+            if (profileCard) profileCard.style.display = "none";
+            return false;
+        }
+
+        /** Shared post-login steps for both QR and manual token paths. */
+        async function onCloudConnected(data) {
+            renderCloudProfile(data);
+
+            const btnCloudText = document.getElementById("btn-cloud-status-text");
+            if (btnCloudText) {
+                const uname = (data.user && (data.user.nickname || data.user.username)) || "已连接";
+                btnCloudText.innerText = `个人中心 (${uname})`;
+            }
+            await fetchStatus();
+        }
+
+        /**
+         * Shows the name-card + settings panels only when there is a
+         * cloud-format save to read them from, and populates them.
+         */
+        function syncProfileSections() {
+            const sections = ["cloud-usercard-section", "cloud-settings-section"];
+            sections.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = isCloudSave ? "block" : "none";
+            });
+            if (isCloudSave) loadCloudProfile();
+        }
+
+        function handleUserdataFile(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const content = evt.target.result;
+                document.getElementById("cloud-token-input").value = content;
+                showToast(`已读取文件 ${file.name}，正在尝试连接...`, "info");
+                connectCloudSave();
+            };
+            reader.readAsText(file);
+        }
+
+        async function connectCloudSave() {
+            let inputVal = document.getElementById("cloud-token-input").value.trim();
+            if (inputVal.startsWith("已检测到项目根目录")) {
+                inputVal = "";
+            }
+
+            const indicator = document.getElementById("cloud-loading-indicator");
+            const loadingText = document.getElementById("cloud-loading-text");
+            const btnConnect = document.getElementById("btn-cloud-connect");
+
+            if (indicator) indicator.style.display = "block";
+            if (loadingText) loadingText.innerText = "正在验证凭据并连接 LeanCloud...";
+            if (btnConnect) btnConnect.disabled = true;
+
+            try {
+                const res = await fetch("/api/cloud/connect", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        token: inputVal,
+                        token_or_userdata: inputVal
+                    })
+                });
+                const data = await res.json();
+                if (data.status === "ok") {
+                    showToast(data.message, "success");
+                    currentCloudUser = data.user;
+                    currentCloudProfile = data.selected_profile;
+
+                    // The token is persisted server-side in data/credentials.json;
+                    // keeping a second copy in the browser would only widen the
+                    // blast radius of a leak.
+                    onCloudConnected(data);
+                } else {
+                    showToast(data.message, "error");
+                }
+            } catch (err) {
+                showToast("云端连接异常: " + err.message, "error");
+            } finally {
+                if (indicator) indicator.style.display = "none";
+                if (btnConnect) btnConnect.disabled = false;
+            }
+        }
+
+        async function pullCloudSaveToEditor() {
+            if (!ensureCatalogOrPromptApk()) return;
+            if (summaryData.modified && !confirm("⚠️ 当前编辑器中有未保存的改动，从云端载入将覆盖当前编辑器内容。确定继续载入吗？")) {
+                return;
+            }
+            const btn = document.getElementById("btn-cloud-pull");
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = "⏳ 正在从云端拉取...";
+            }
+            showToast("正在从 TapTap 云端下载并解密档案...", "info");
+            try {
+                const res = await fetch("/api/cloud/pull_to_editor", { method: "POST" });
+                const data = await res.json();
+                if (handleNeedApk(data)) return;
+                if (data.status === "ok") {
+                    showToast(data.message, "success");
+                    await fetchStatus();
+                    await fetchSongs();
+                    syncProfileSections();
+                } else {
+                    showToast(data.message, "error");
+                }
+            } catch (err) {
+                showToast("拉取云端档案异常: " + err.message, "error");
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = "☁️📥 从云端载入 (下载)";
+                }
+            }
+        }
+
+        async function pushEditorSaveToCloud() {
+            if (!ensureCatalogOrPromptApk()) return;
+            if (!confirm("⚠️ 确定将当前编辑器中展示的存档直接打包上传至 TapTap 官方云端吗？\n\n系统会先拉取云端最新档案，再将本地成绩与解锁合并进去，因此设置、名片与剧情进度不会丢失。\n\n系统会在本地 backups/ 目录为您自动备份云端旧档案。上传成功后，请在手机上打开 Phigros，点击【设置 -> 云存档 -> 从云端同步】下载覆盖本地。")) {
+                return;
+            }
+            const btn = document.getElementById("btn-cloud-push");
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = "⏳ 正在打包并上传至云端...";
+            }
+            showToast("正在拉取云端档案并合并本地存档...", "info");
+            try {
+                const res = await fetch("/api/cloud/push_from_editor", { method: "POST" });
+                const data = await res.json();
+                if (handleNeedApk(data)) return;
+                if (data.status === "ok") {
+                    showToast(data.message, "success");
+                    if (data.selected_profile) {
+                        currentCloudProfile = data.selected_profile;
+                    }
+                    await fetchStatus();
+                } else {
+                    showToast(data.message, "error");
+                }
+            } catch (err) {
+                showToast("上传云端异常: " + err.message, "error");
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = "☁️🚀 上传至云端";
+                }
+            }
+        }
+
+        async function logoutCloudSave() {
+            if (!confirm("确定要登出当前云端账号吗？\n\n本机保存的登录凭证会被一并删除，下次需要重新扫码登录。")) {
+                return;
+            }
+            try {
+                const res = await fetch("/api/cloud/logout", { method: "POST" });
+                const data = await res.json();
+                if (data.status === "ok") {
+                    showToast(data.message, "info");
+                    currentCloudUser = null;
+                    currentCloudProfile = null;
+                    stopQrPolling();
+                    resetQrSurface();
+
+                    // Reset modal UI
+                    const connectSection = document.getElementById("cloud-connect-section");
+                    if (connectSection) connectSection.style.display = "block";
+                    const profileCard = document.getElementById("cloud-profile-card");
+                    if (profileCard) profileCard.style.display = "none";
+
+                    const btnCloudText = document.getElementById("btn-cloud-status-text");
+                    if (btnCloudText) btnCloudText.innerText = "云存档 (TapTap)";
+
+                    const modalTitle = document.getElementById("cloud-modal-title");
+                    if (modalTitle) modalTitle.innerText = "Phigros 个人中心 / 云存档管理";
+
+                    const pullBtn = document.getElementById("btn-cloud-pull");
+                    if (pullBtn) pullBtn.style.display = "none";
+                    const pushBtn = document.getElementById("btn-cloud-push");
+                    if (pushBtn) pushBtn.style.display = "none";
+
+                    closeModal("cloud-modal");
+                    await fetchStatus();
+                } else {
+                    showToast(data.message, "error");
+                }
+            } catch (err) {
+                showToast("登出失败: " + err.message, "error");
+            }
+        }
+
+        function renderCloudProfile(data) {
+            const connectSection = document.getElementById("cloud-connect-section");
+            if (connectSection) connectSection.style.display = "none";
+
+            const profileCard = document.getElementById("cloud-profile-card");
+            if (!profileCard) return;
+            profileCard.style.display = "flex";
+
+            const user = data.user || {};
+            const profile = data.selected_profile || {};
+            const summary = profile.parsed_summary || {};
+
+            const modalTitle = document.getElementById("cloud-modal-title");
+            if (modalTitle) {
+                modalTitle.innerText = `个人中心 - ${user.nickname || user.username || "Phigros 玩家"}`;
+            }
+
+            document.getElementById("cloud-player-name").innerText = user.nickname || user.username || "未知玩家";
+            document.getElementById("cloud-object-id").innerText = profile.objectId || "--";
+            
+            let updatedAtStr = "--";
+            if (profile.updatedAt) {
+                const d = new Date(profile.updatedAt);
+                updatedAtStr = d.toLocaleString();
+            }
+            document.getElementById("cloud-updated-at").innerText = updatedAtStr;
+
+            const rks = summary.ranking_score !== undefined ? summary.ranking_score.toFixed(2) : "--";
+            document.getElementById("cloud-rks").innerText = rks;
+
+            let rankText = "--";
+            if (summary.challenge_rank !== undefined) {
+                const colorText = summary.rank_color_text || "";
+                rankText = `${colorText} ${summary.rank_num || 0} (${summary.challenge_rank})`;
+            }
+            document.getElementById("cloud-challenge-rank").innerText = rankText;
+
+            const levelsDiv = document.getElementById("cloud-levels-summary");
+            if (levelsDiv) {
+                if (summary.level_summary && summary.level_summary.length > 0) {
+                    const parts = summary.level_summary.map(lvl => 
+                        `<span style="margin-right: 12px;"><b>${lvl.difficulty}</b>: ${lvl.cleared}通关 / ${lvl.fc}FC / ${lvl.phi}φ</span>`
+                    );
+                    levelsDiv.innerHTML = `<span style="color:var(--text-primary);font-weight:600;">各难度通关统计：</span> ` + parts.join("");
+                } else {
+                    levelsDiv.innerHTML = "<span>各难度统计：未获取到 summary 数据</span>";
+                }
+            }
+        }
+
+        function downloadCloudSaveFile() {
+            return downloadFromApi(
+                "/api/cloud/export_save",
+                "com.PigeonGames.Phigros.save",
+                "正在下载云存档 .save 备份文件..."
+            );
+        }
+
+        function exportCloudSaveJson() {
+            return downloadFromApi(
+                "/api/cloud/export_json",
+                "phigros_cloud_save_decrypted.json",
+                "正在导出解密后的云存档 JSON..."
+            );
+        }
+
+        // APK Upload & Extraction Handlers
+        async function uploadApkBlob(blob, filename = "phigros.apk") {
+            const progressContainer = document.getElementById("apk-progress-container");
+            const progressText = document.getElementById("apk-progress-text");
+            if (progressContainer) {
+                progressContainer.style.display = "block";
+                progressContainer.classList.remove("hidden");
+            }
+            if (progressText) progressText.innerText = "正在使用 UnityPy 提取 GameInformation 与 GetCollectionControl... 请稍候";
+            showToast("正在解析 APK 游戏资源，请稍候...", "info");
+
+            try {
+                const formData = new FormData();
+                formData.append("file", blob, filename);
+                const res = await fetch("/api/upload_apk", { method: "POST", body: formData });
+                const data = await res.json();
+                if (data.status === "ok") {
+                    showToast(data.message, "success");
+                    localStorage.setItem("phigros_apk_onboarded", "true");
+                    await fetchStatus();
+                    await fetchSongs();
+                    if (progressText) progressText.innerText = "✅ " + data.message;
+                    setTimeout(() => {
+                        if (progressContainer) {
+                            progressContainer.style.display = "none";
+                            progressContainer.classList.add("hidden");
+                        }
+                        closeModal("apk-modal");
+                    }, 1500);
+                } else {
+                    showToast(data.message, "error");
+                    if (progressContainer) {
+                        progressContainer.style.display = "none";
+                        progressContainer.classList.add("hidden");
+                    }
+                }
+            } catch (err) {
+                console.error("APK upload error:", err);
+                showToast("APK 解析失败：" + err.message, "error");
+                if (progressContainer) {
+                    progressContainer.style.display = "none";
+                    progressContainer.classList.add("hidden");
+                }
+            }
+        }
+
+        async function handleApkFileInput(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            await uploadApkBlob(file, file.name);
+        }
+
+        async function handleApkDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const dropzone = document.getElementById("apk-dropzone");
+            if (dropzone) {
+                dropzone.style.borderColor = "rgba(0, 229, 255, 0.35)";
+                dropzone.style.background = "rgba(0, 0, 0, 0.2)";
+            }
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                const file = e.dataTransfer.files[0];
+                await uploadApkBlob(file, file.name);
+            }
+        }
+
+        async function submitApkLocalPath() {
+            const input = document.getElementById("apk-local-path-input");
+            const path = input ? input.value.trim() : "";
+            if (!path) {
+                showToast("请输入本地 APK 文件完整路径", "error");
+                return;
+            }
+            const progressContainer = document.getElementById("apk-progress-container");
+            const progressText = document.getElementById("apk-progress-text");
+            if (progressContainer) {
+                progressContainer.style.display = "block";
+                progressContainer.classList.remove("hidden");
+            }
+            if (progressText) progressText.innerText = "正在从本地路径读取并解析 APK...";
+
+            try {
+                const res = await fetch("/api/load_apk_path", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ path: path })
+                });
+                const data = await res.json();
+                if (data.status === "ok") {
+                    showToast(data.message, "success");
+                    localStorage.setItem("phigros_apk_onboarded", "true");
+                    await fetchStatus();
+                    await fetchSongs();
+                    if (progressText) progressText.innerText = "✅ " + data.message;
+                    setTimeout(() => {
+                        if (progressContainer) {
+                            progressContainer.style.display = "none";
+                            progressContainer.classList.add("hidden");
+                        }
+                        closeModal("apk-modal");
+                    }, 1500);
+                } else {
+                    showToast(data.message, "error");
+                    if (progressContainer) {
+                        progressContainer.style.display = "none";
+                        progressContainer.classList.add("hidden");
+                    }
+                }
+            } catch (err) {
+                showToast("解析失败：" + err.message, "error");
+                if (progressContainer) {
+                    progressContainer.style.display = "none";
+                    progressContainer.classList.add("hidden");
+                }
+            }
+        }
+
+        // Fetch status & songs
+        async function fetchStatus() {
+            try {
+                const res = await fetch("/api/status");
+                const data = await res.json();
+                if (data.status === "ok") {
+                    summaryData = data.summary;
+                    const hasSave = data.has_save;
+                    const statusTextEl = document.getElementById("save-status-text");
+                    if (hasSave) {
+                        statusTextEl.innerText = "已载入存档" + (summaryData.modified ? " (已编辑*)" : "");
+                    } else {
+                        statusTextEl.innerText = "尚未载入存档 (请点击右上角【打开 / 上传存档】)";
+                    }
+
+                    // 云格式存档上下文：决定【下载.save】与【剧情进度】是否出现。
+                    isCloudSave = !!data.is_cloud_save;
+                    progressSupported = !!data.progress_supported;
+                    progressError = data.progress_error || null;
+                    updateCloudSaveButtons(hasSave);
+
+                    // 未有有效存档时，不显示【下载XML】【导出JSON】【数据分析】【批量操作 & 解锁】【货币 & 课题分】
+                    const saveActionIds = ["btn-export-xml", "btn-export-json", "btn-analysis", "btn-batch-ops", "btn-currency"];
+                    saveActionIds.forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) {
+                            el.style.display = hasSave ? "inline-flex" : "none";
+                        }
+                    });
+
+                    // 未有有效存档时，隐藏统计面板与曲库搜索筛选栏
+                    const statsGridEl = document.getElementById("stats-grid");
+                    if (statsGridEl) statsGridEl.style.display = hasSave ? "grid" : "none";
+
+                    const controlsBarEl = document.getElementById("controls-bar");
+                    if (controlsBarEl) controlsBarEl.style.display = hasSave ? "flex" : "none";
+
+                    if (data.apk_status) {
+                        const apk = data.apk_status;
+                        const hasDb = !!apk.has_database;
+                        window.serverHasDatabase = hasDb;
+                        if (hasDb) {
+                            localStorage.setItem("phigros_apk_onboarded", "true");
+                        }
+                        const btnTextEl = document.getElementById("btn-apk-status-text");
+                        if (btnTextEl) {
+                            btnTextEl.innerText = hasDb ? `APK 曲库 (${apk.total_songs}首)` : `APK 曲库导入/更新`;
+                        }
+                        const apkVerEl = document.getElementById("apk-status-version");
+                        if (apkVerEl) apkVerEl.innerText = apk.version;
+                        const apkCountsEl = document.getElementById("apk-status-counts");
+                        if (apkCountsEl) {
+                            apkCountsEl.innerText = hasDb 
+                                ? `${apk.total_songs} 首曲目 | ${apk.collections} 项收藏 | ${apk.avatars} 头像`
+                                : `未收录 (请上传 APK 提取)`;
+                        }
+
+                        // 控制清除数据库按钮状态
+                        const clearDbBtn = document.getElementById("btn-clear-db");
+                        if (clearDbBtn) {
+                            clearDbBtn.style.display = hasDb ? "inline-flex" : "none";
+                        }
+                        const modalClearDbBtn = document.getElementById("btn-modal-clear-db");
+                        if (modalClearDbBtn) {
+                            modalClearDbBtn.style.display = hasDb ? "inline-flex" : "none";
+                        }
+                    }
+
+                    if (data.cloud_status) {
+                        serverHasSavedToken = !!data.cloud_status.has_saved_token;
+                        const cs = data.cloud_status;
+                        const isConnected = !!cs.is_connected;
+                        const btnCloudText = document.getElementById("btn-cloud-status-text");
+                        if (btnCloudText) {
+                            if (isConnected && cs.user) {
+                                btnCloudText.innerText = `个人中心 (${cs.user.nickname || cs.user.username})`;
+                            } else if (serverHasSavedToken) {
+                                btnCloudText.innerText = `云端 (凭证已保存，待重连)`;
+                            } else {
+                                btnCloudText.innerText = `个人中心 (扫码登录)`;
+                            }
+                        }
+
+                        // 动态显隐云端操作按钮：云端连接后显示【从云端载入 (下载)】与【上传至云端】
+                        const pullBtn = document.getElementById("btn-cloud-pull");
+                        if (pullBtn) {
+                            pullBtn.style.display = isConnected ? "inline-flex" : "none";
+                        }
+                        const pushBtn = document.getElementById("btn-cloud-push");
+                        if (pushBtn) {
+                            pushBtn.style.display = (isConnected && hasSave) ? "inline-flex" : "none";
+                        }
+                    }
+
+                    document.getElementById("stat-total-songs").innerText = summaryData.total_songs || 0;
+                    const playedEl = document.getElementById("stat-played-songs");
+                    if (playedEl) playedEl.innerText = summaryData.played_songs || 0;
+                    document.getElementById("stat-total-records").innerText = summaryData.total_records || 0;
+                    document.getElementById("stat-phi").innerText = summaryData.rating_counts?.phi || 0;
+                    document.getElementById("stat-v-fc").innerText = summaryData.rating_counts?.v_fc || 0;
+                    document.getElementById("stat-v").innerText = summaryData.rating_counts?.v || 0;
+                    document.getElementById("stat-s").innerText = summaryData.rating_counts?.s || 0;
+                    document.getElementById("stat-a").innerText = summaryData.rating_counts?.a || 0;
+                    document.getElementById("stat-rank").innerText = summaryData.challenge_rank || "-";
+                }
+            } catch (err) {
+                console.error("Error fetching status:", err);
+            }
+        }
+
+        async function fetchSongs() {
+            try {
+                const res = await fetch("/api/songs");
+                const data = await res.json();
+                if (data.status === "ok") {
+                    allSongs = data.songs;
+                    renderSongs();
+                }
+            } catch (err) {
+                console.error("Error fetching songs:", err);
+            }
+        }
+
+        async function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            // XML / JSON / .save are all accepted; the server sniffs the format.
+            showToast(`正在上传并解包 ${file.name}...`, "info");
+            const formData = new FormData();
+            formData.append("file", file);
+            const res = await fetch("/api/upload", { method: "POST", body: formData });
+            const data = await res.json();
+            if (data.status === "ok") {
+                showToast(data.message, "success");
+                if (data.is_cloud) {
+                    currentCloudUser = data.user;
+                    currentCloudProfile = data.selected_profile;
+                    renderCloudProfile(data);
+                    openCloudModal();
+                } else {
+                    await fetchStatus();
+                    await fetchSongs();
+                }
+            } else {
+                showToast(data.message, "error");
+            }
+        }
+
+        function calculateRating(score, fc) {
+            score = parseInt(score) || 0;
+            if (score >= 1000000) return "φ";
+            if (score >= 960000) return fc ? "V (FC)" : "V";
+            if (score >= 920000) return fc ? "S (FC)" : "S";
+            if (score >= 880000) return fc ? "A (FC)" : "A";
+            if (score >= 820000) return fc ? "B (FC)" : "B";
+            if (score >= 700000) return fc ? "C (FC)" : "C";
+            return "False";
+        }
+
+        function getRatingBadgeClass(rating) {
+            if (rating === "φ") return "badge-phi";
+            if (rating === "V (FC)") return "badge-v_fc";
+            if (rating.startsWith("V")) return "badge-v";
+            if (rating.startsWith("S")) return "badge-s";
+            if (rating.startsWith("A")) return "badge-a";
+            if (rating.startsWith("B")) return "badge-b";
+            if (rating.startsWith("C")) return "badge-c";
+            if (rating.startsWith("False")) return "badge-f";
+            return "badge-none";
+        }
+
+        // Render song cards
+        function renderSongs() {
+            const container = document.getElementById("song-grid-container");
+            if (allSongs.length === 0) {
+                // Restore the grid: the empty state is laid out as a grid cell,
+                // and we may be returning from the flat list view.
+                container.classList.add("song-grid");
+                container.innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 80px 20px; background: var(--bg-card); border: 2px dashed var(--border-color); border-radius: var(--radius-lg); margin-top: 10px;">
+                        <div style="font-size: 56px; margin-bottom: 16px;">🎮</div>
+                        <h2 style="font-size: 22px; color: #fff; margin-bottom: 10px;">尚未载入 Phigros 存档</h2>
+                        <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 14px; max-width: 500px; margin-left: auto; margin-right: auto; line-height: 1.6;">
+                            请选择您的存档文件（<code>.xml</code> 或 <code>.json</code>），或直接拖拽文件到此窗口。
+                        </p>
+                        <button class="btn btn-primary" style="font-size: 15px; padding: 12px 28px;" onclick="document.getElementById('file-upload').click()">📂 选择并载入存档文件</button>
+                    </div>
+                `;
+                return;
+            }
+            const query = document.getElementById("search-input").value.toLowerCase().trim();
+            const filterPlayStatus = document.getElementById("filter-play-status") ? document.getElementById("filter-play-status").value : "ALL";
+            const filterDiff = document.getElementById("filter-diff").value;
+            const filterRating = document.getElementById("filter-rating").value;
+            const sortBy = document.getElementById("filter-sort").value;
+
+            let filtered = allSongs.filter(s => {
+                const matchQuery = !query || 
+                    s.title.toLowerCase().includes(query) || 
+                    s.artist.toLowerCase().includes(query) || 
+                    s.id.toLowerCase().includes(query) ||
+                    (s.catalog_id && s.catalog_id.toLowerCase().includes(query));
+                if (!matchQuery) return false;
+
+                if (filterPlayStatus === "PLAYED" && !s.has_records) return false;
+                if (filterPlayStatus === "UNPLAYED" && s.has_records) return false;
+
+                if (filterDiff !== "ALL") {
+                    const diffRec = s.diffs[filterDiff];
+                    if (!diffRec || !diffRec.has_record) return false;
+                }
+
+                if (filterRating !== "ALL") {
+                    if (filterRating === "UNPLAYED") {
+                        const anyPlayed = Object.values(s.diffs).some(d => d.has_record);
+                        if (anyPlayed) return false;
+                    } else {
+                        const anyMatchRating = Object.values(s.diffs).some(d => d.has_record && d.rating === filterRating);
+                        if (!anyMatchRating) return false;
+                    }
+                }
+                return true;
+            });
+
+            // Flat ranking view: one row per chart. Shares the filters above,
+            // so switching views keeps the same scope.
+            if (songView === "charts") {
+                // The container is a card grid by default; a full-width list
+                // must opt out of it, or every row is trapped in a 460px
+                // grid cell and the title collapses to a single letter.
+                container.classList.remove("song-grid");
+                container.innerHTML = "";
+                renderChartList(
+                    container,
+                    buildChartRows(filtered, query, filterDiff, filterRating),
+                    sortBy
+                );
+                return;
+            }
+            container.classList.add("song-grid");
+
+            // Sorting
+            filtered.sort((a, b) => {
+                if (sortBy === "title_asc") return a.title.localeCompare(b.title);
+                if (sortBy === "rks_desc" || sortBy === "rks_asc") {
+                    // When a single difficulty is selected, rank by that
+                    // chart's RKS; otherwise by the song's best chart.
+                    const pick = (s) => {
+                        if (filterDiff !== "ALL") {
+                            const rec = s.diffs[filterDiff];
+                            return (rec && rec.rks) || 0;
+                        }
+                        return s.best_chart_rks || 0;
+                    };
+                    const d = pick(b) - pick(a);
+                    return sortBy === "rks_desc" ? d : -d;
+                }
+                if (sortBy === "played_first") {
+                    if (a.has_records !== b.has_records) return b.has_records ? 1 : -1;
+                    return a.title.localeCompare(b.title);
+                }
+                if (sortBy === "unplayed_first") {
+                    if (a.has_records !== b.has_records) return a.has_records ? 1 : -1;
+                    return a.title.localeCompare(b.title);
+                }
+                if (sortBy === "score_desc") {
+                    const maxA = Math.max(...Object.values(a.diffs).map(d => d.score || 0));
+                    const maxB = Math.max(...Object.values(b.diffs).map(d => d.score || 0));
+                    return maxB - maxA;
+                }
+                if (sortBy === "score_asc") {
+                    const maxA = Math.max(...Object.values(a.diffs).map(d => d.score || 0));
+                    const maxB = Math.max(...Object.values(b.diffs).map(d => d.score || 0));
+                    return maxA - maxB;
+                }
+                return 0;
+            });
+
+            container.innerHTML = "";
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: var(--text-secondary); background: var(--bg-card); border-radius: var(--radius-lg); border: 1px dashed var(--border-color);">
+                        <div style="font-size: 32px; margin-bottom: 8px;">🔍</div>
+                        <p style="font-size: 14px;">未找到匹配筛选条件的曲目</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const frag = document.createDocumentFragment();
+            filtered.forEach(song => {
+                const card = createSongCard(song);
+                frag.appendChild(card);
+            });
+            container.appendChild(frag);
+        }
+
+        // ===== Analysis panel =====
+        // Computed entirely from the loaded save plus the user's own APK
+        // catalog: no login, no network, works for XML / JSON / .save alike.
+        let analysisData = null;
+        let analysisTab = "b30";
+        let suggestSort = "effort";   // 'effort' = least acc needed, 'gain' = most RKS
+        let suggestScope = "all";     // 'all' | 'inside' | 'outside'
+
+        async function openAnalysisModal() {
+            openModal("analysis-modal");
+            setAnalysisTab("b30");
+            document.getElementById("analysis-body").innerHTML =
+                `<div style="text-align:center;padding:60px 20px;color:var(--text-secondary);">正在计算...</div>`;
+            try {
+                const resp = await fetch("/api/analysis");
+                const data = await resp.json();
+                if (handleNeedApk(data)) {
+                    closeModal("analysis-modal");
+                    return;
+                }
+                if (data.status !== "ok") {
+                    document.getElementById("analysis-body").innerHTML =
+                        `<div style="text-align:center;padding:60px 20px;color:var(--text-secondary);">${escapeHtml(data.message || "分析失败")}</div>`;
+                    return;
+                }
+                analysisData = data;
+                renderAnalysisOverview();
+                renderAnalysisBody();
+            } catch (err) {
+                document.getElementById("analysis-body").innerHTML =
+                    `<div style="text-align:center;padding:60px 20px;color:var(--text-secondary);">分析失败：${escapeHtml(err.message)}</div>`;
+            }
+        }
+
+        function setAnalysisTab(tab) {
+            analysisTab = tab;
+            [["b30","an-tab-b30"],["sug","an-tab-sug"],["dist","an-tab-dist"],["cov","an-tab-cov"]]
+                .forEach(([k, id]) => {
+                    const el = document.getElementById(id);
+                    if (el) el.classList.toggle("active", k === tab);
+                });
+            if (analysisData) renderAnalysisBody();
+        }
+
+        function renderAnalysisOverview() {
+            const d = analysisData;
+            if (!d) return;
+            document.getElementById("an-rks").innerText = (d.rks || 0).toFixed(4);
+            document.getElementById("an-threshold").innerText =
+                d.threshold > 0 ? d.threshold.toFixed(4) : "未满 27 首";
+            document.getElementById("an-coverage").innerText =
+                `${d.played_charts} / ${d.total_charts}`;
+        }
+
+        /** One chart row, shared by the p3/b27 and suggestion tables. */
+        function analysisRow(rank, c, extraCols) {
+            return `
+                <div class="chart-row" title="点击在曲目卡片中编辑该成绩"
+                     onclick="closeModal('analysis-modal'); focusChart('${String(c.song_id).replace(/'/g, "\\'")}', '${c.diff}')">
+                    <span class="c-rank">${rank}</span>
+                    <span><span class="diff-tag diff-${c.diff}">${c.diff}</span></span>
+                    <span class="c-title">${escapeHtml(c.title)}</span>
+                    ${extraCols}
+                </div>
+            `;
+        }
+
+        function renderAnalysisBody() {
+            const body = document.getElementById("analysis-body");
+            const d = analysisData;
+            if (!d) return;
+
+            if (analysisTab === "b30") {
+                const cols = (c) => `
+                    <span class="c-const">${c.constant.toFixed(1)}</span>
+                    <span class="c-acc">${c.acc.toFixed(2)}%</span>
+                    <span class="c-score">${(c.score || 0).toLocaleString()}</span>
+                    <span class="c-rks">${c.rks.toFixed(4)}</span>
+                `;
+                let html = `<div class="chart-list">`;
+                html += `<div style="font-size:11px;color:var(--text-secondary);padding:6px 4px 2px;font-weight:700;">── p3 · 最高单曲 RKS 的 AP 谱面 ──</div>`;
+                if (d.phi.length === 0) {
+                    html += `<div style="padding:8px 14px;color:var(--text-muted);font-size:12px;">暂无 AP 谱面</div>`;
+                }
+                d.phi.forEach((c, i) => { html += analysisRow(`φ${i + 1}`, c, cols(c)); });
+
+                html += `<div style="font-size:11px;color:var(--text-secondary);padding:12px 4px 2px;font-weight:700;">── b27 · 其余最高 27 张 ──</div>`;
+                d.best.forEach((c, i) => {
+                    const isLast = (i === d.best.length - 1 && d.best.length >= 27);
+                    const row = analysisRow(`#${i + 1}`, c, cols(c));
+                    // The weakest b27 entry is the bar every suggestion aims at.
+                    html += isLast
+                        ? row.replace('class="chart-row"', 'class="chart-row" style="border-color:rgba(255,193,7,0.5);background:rgba(255,193,7,0.06);"')
+                        : row;
+                });
+                html += `</div>`;
+                if (d.best.length >= 27) {
+                    html += `<div style="font-size:11px;color:var(--text-muted);margin-top:10px;">黄框为 b27 门槛（#27），推分建议以此为基准。p3 与 b27 不重叠，除数固定为 30。</div>`;
+                }
+                body.innerHTML = html;
+                return;
+            }
+
+            if (analysisTab === "sug") {
+                const key = `suggestions_${suggestScope === "all" ? "" : suggestScope + "_"}by_${suggestSort}`;
+                const list = d[key] || d[`suggestions_by_${suggestSort}`] || [];
+
+                let html = `
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+                        <span style="font-size:12px;color:var(--text-secondary);">排序</span>
+                        <select class="filter-select" style="padding:6px 10px;font-size:12px;" onchange="suggestSort=this.value;renderAnalysisBody();">
+                            <option value="effort" ${suggestSort === "effort" ? "selected" : ""}>⚡ 最省力（所需 ACC 增量最小）</option>
+                            <option value="gain" ${suggestSort === "gain" ? "selected" : ""}>💎 最提分（RKS 提升最大）</option>
+                        </select>
+                        <span style="font-size:12px;color:var(--text-secondary);margin-left:6px;">范围</span>
+                        <select class="filter-select" style="padding:6px 10px;font-size:12px;" onchange="suggestScope=this.value;renderAnalysisBody();">
+                            <option value="all" ${suggestScope === "all" ? "selected" : ""}>全部</option>
+                            <option value="inside" ${suggestScope === "inside" ? "selected" : ""}>仅已入 b30（打磨）</option>
+                            <option value="outside" ${suggestScope === "outside" ? "selected" : ""}>仅榜外（冲榜）</option>
+                        </select>
+                    </div>
+                `;
+
+                if (list.length === 0) {
+                    html += `<div style="text-align:center;padding:40px 20px;color:var(--text-secondary);">暂无推分建议</div>`;
+                    body.innerHTML = html;
+                    return;
+                }
+
+                html += `<div class="chart-list">`;
+                list.forEach((s, i) => {
+                    const tag = s.in_b30
+                        ? `<span style="font-size:10px;color:#ffc107;border:1px solid rgba(255,193,7,0.4);border-radius:4px;padding:1px 5px;margin-left:6px;">b30</span>`
+                        : "";
+                    html += `
+                        <div class="chart-row" style="grid-template-columns: 46px 44px minmax(0,1fr) 58px 148px 76px; gap:8px;"
+                             title="点击在曲目卡片中编辑该成绩"
+                             onclick="closeModal('analysis-modal'); focusChart('${String(s.song_id).replace(/'/g, "\\'")}', '${s.diff}')">
+                            <span class="c-rank">#${i + 1}</span>
+                            <span><span class="diff-tag diff-${s.diff}">${s.diff}</span></span>
+                            <span class="c-title">${escapeHtml(s.title)}${tag}</span>
+                            <span class="c-const">${s.constant.toFixed(1)}</span>
+                            <span class="c-acc">${s.acc.toFixed(2)}% → <b style="color:var(--color-s);">${s.acc_needed.toFixed(2)}%</b> <span style="color:var(--text-muted);font-size:11px;">(+${s.acc_delta.toFixed(2)})</span></span>
+                            <span class="c-rks">+${s.rks_gain.toFixed(4)}</span>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+                html += `<div style="font-size:11px;color:var(--text-muted);margin-top:10px;">目标 ACC 为高于当前成绩的下一个现实档位；RKS 提升为该谱进入/提升后对总 RKS 的影响（÷30）。</div>`;
+                body.innerHTML = html;
+                return;
+            }
+
+            if (analysisTab === "dist") {
+                const entries = Object.entries(d.distribution || {})
+                    .sort((a, b) => parseFloat(b[0]) - parseFloat(a[0]));
+                if (entries.length === 0) {
+                    body.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-secondary);">暂无数据</div>`;
+                    return;
+                }
+                const max = Math.max(...entries.map(([, v]) => v.count));
+                let html = `<div style="display:flex;flex-direction:column;gap:6px;">`;
+                entries.forEach(([bucket, v]) => {
+                    const pct = max > 0 ? (v.count / max) * 100 : 0;
+                    html += `
+                        <div style="display:grid;grid-template-columns:86px 1fr 60px 92px;gap:10px;align-items:center;font-size:12px;">
+                            <span style="color:var(--text-secondary);font-variant-numeric:tabular-nums;">${bucket}</span>
+                            <span style="background:rgba(255,255,255,0.04);border-radius:4px;height:18px;position:relative;overflow:hidden;">
+                                <span style="position:absolute;inset:0 auto 0 0;width:${pct}%;background:linear-gradient(90deg,rgba(0,229,255,0.5),rgba(0,229,255,0.2));"></span>
+                            </span>
+                            <span style="color:var(--text-primary);text-align:right;font-variant-numeric:tabular-nums;">${v.count} 张</span>
+                            <span style="color:var(--text-secondary);text-align:right;font-variant-numeric:tabular-nums;">均 ${v.avg_acc.toFixed(2)}%</span>
+                        </div>
+                    `;
+                });
+                html += `</div><div style="font-size:11px;color:var(--text-muted);margin-top:12px;">按谱面定数分段统计已游玩谱面数量与平均 ACC。</div>`;
+                body.innerHTML = html;
+                return;
+            }
+
+            // coverage
+            let html = `<div style="display:flex;flex-direction:column;gap:10px;">`;
+            ["EZ", "HD", "IN", "AT"].forEach(diff => {
+                const c = (d.coverage || {})[diff] || { played: 0, total: 0 };
+                const pct = c.total > 0 ? (c.played / c.total) * 100 : 0;
+                html += `
+                    <div style="display:grid;grid-template-columns:52px 1fr 120px;gap:12px;align-items:center;">
+                        <span class="diff-tag diff-${diff}">${diff}</span>
+                        <span style="background:rgba(255,255,255,0.04);border-radius:5px;height:22px;position:relative;overflow:hidden;">
+                            <span style="position:absolute;inset:0 auto 0 0;width:${pct}%;background:linear-gradient(90deg,rgba(0,230,118,0.5),rgba(0,230,118,0.18));"></span>
+                        </span>
+                        <span style="font-size:12px;color:var(--text-secondary);text-align:right;font-variant-numeric:tabular-nums;">${c.played} / ${c.total}（${pct.toFixed(1)}%）</span>
+                    </div>
+                `;
+            });
+            html += `</div><div style="font-size:11px;color:var(--text-muted);margin-top:12px;">分母为当前导入曲库中存在该难度的谱面总数。</div>`;
+            body.innerHTML = html;
+        }
+
+        // ===== Flat chart ranking view =====
+        // 'cards' = one card per song (multiple difficulties inside);
+        // 'charts' = one compact row per chart, ranked by single-chart RKS.
+        let songView = "cards";
+
+        function setSongView(view) {
+            songView = view;
+            const cardsBtn = document.getElementById("view-btn-cards");
+            const chartsBtn = document.getElementById("view-btn-charts");
+            if (cardsBtn) cardsBtn.classList.toggle("active", view === "cards");
+            if (chartsBtn) chartsBtn.classList.toggle("active", view === "charts");
+            renderSongs();
+        }
+
+        /**
+         * Flattens songs into one entry per played chart.
+         * Respects the same search / difficulty / rating filters as the
+         * card grid, so switching views never silently changes the scope.
+         */
+        function buildChartRows(songs, query, filterDiff, filterRating) {
+            const rows = [];
+            songs.forEach(song => {
+                Object.entries(song.diffs || {}).forEach(([diff, rec]) => {
+                    if (!rec || !rec.has_record) return;
+                    if (filterDiff !== "ALL" && diff !== filterDiff) return;
+                    if (filterRating !== "ALL") {
+                        if (filterRating === "UNPLAYED") return;
+                        if (rec.rating !== filterRating) return;
+                    }
+                    rows.push({
+                        songId: song.id,
+                        title: song.title,
+                        artist: song.artist,
+                        diff: diff,
+                        constant: rec.constant || 0,
+                        acc: rec.acc || 0,
+                        score: rec.score || 0,
+                        rating: rec.rating,
+                        rks: rec.rks || 0
+                    });
+                });
+            });
+            return rows;
+        }
+
+        function renderChartList(container, rows, sortBy) {
+            if (sortBy === "rks_asc") rows.sort((a, b) => a.rks - b.rks);
+            else if (sortBy === "score_desc") rows.sort((a, b) => b.score - a.score);
+            else if (sortBy === "score_asc") rows.sort((a, b) => a.score - b.score);
+            else if (sortBy === "title_asc") rows.sort((a, b) => a.title.localeCompare(b.title));
+            else rows.sort((a, b) => b.rks - a.rks);   // default: RKS desc
+
+            if (rows.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 60px 20px; color: var(--text-secondary); background: var(--bg-card); border-radius: var(--radius-lg); border: 1px dashed var(--border-color);">
+                        <div style="font-size: 32px; margin-bottom: 8px;">🔍</div>
+                        <p style="font-size: 14px;">没有符合条件的谱面成绩</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const list = document.createElement("div");
+            list.className = "chart-list";
+
+            const frag = document.createDocumentFragment();
+            rows.forEach((r, i) => {
+                const row = document.createElement("div");
+                row.className = "chart-row";
+                row.title = "点击在曲目卡片中编辑该成绩";
+                row.onclick = () => focusChart(r.songId, r.diff);
+
+                const constText = r.constant > 0 ? r.constant.toFixed(1) : "—";
+                const rksText = r.constant > 0 ? r.rks.toFixed(4) : "—";
+                row.innerHTML = `
+                    <span class="c-rank">#${i + 1}</span>
+                    <span><span class="diff-tag diff-${r.diff}">${r.diff}</span></span>
+                    <span class="c-title">${escapeHtml(r.title)}<span class="c-artist">${escapeHtml(r.artist || "")}</span></span>
+                    <span class="c-const">${constText}</span>
+                    <span class="c-acc">${r.acc.toFixed(2)}%</span>
+                    <span class="c-score">${r.score.toLocaleString()}</span>
+                    <span class="c-rks">${rksText}</span>
+                `;
+                frag.appendChild(row);
+            });
+            list.appendChild(frag);
+            container.innerHTML = "";
+            container.appendChild(list);
+        }
+
+        function escapeHtml(s) {
+            return String(s == null ? "" : s)
+                .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
+
+        /** Jumps from a ranking row to that chart's card, ready to edit. */
+        function focusChart(songId, diff) {
+            activeDiffState[songId] = diff;
+            setSongView("cards");
+            setTimeout(() => {
+                const card = document.getElementById(`song-card-${CSS.escape(songId)}`);
+                if (!card) return;
+                card.scrollIntoView({ behavior: "smooth", block: "center" });
+                card.style.transition = "box-shadow 0.3s";
+                card.style.boxShadow = "0 0 0 2px var(--accent-cyan)";
+                setTimeout(() => { card.style.boxShadow = ""; }, 1600);
+            }, 60);
+        }
+
+        function createSongCard(song) {
+            const card = document.createElement("div");
+            card.className = "song-card";
+            card.id = `song-card-${CSS.escape(song.id)}`;
+
+            // Choose active difficulty for this card
+            if (!activeDiffState[song.id]) {
+                if (song.diffs.IN && song.diffs.IN.has_record) activeDiffState[song.id] = "IN";
+                else if (song.diffs.HD && song.diffs.HD.has_record) activeDiffState[song.id] = "HD";
+                else if (song.diffs.EZ && song.diffs.EZ.has_record) activeDiffState[song.id] = "EZ";
+                else if (song.diffs.IN) activeDiffState[song.id] = "IN";
+                else activeDiffState[song.id] = Object.keys(song.diffs)[0] || "IN";
+            }
+            const activeDiff = activeDiffState[song.id];
+            const currentRec = song.diffs[activeDiff] || { score: 0, acc: 0, c: 0, fc: false, rating: "未游玩", has_record: false };
+
+            const statusBadge = song.has_records 
+                ? '<span style="font-size:10px; background:rgba(0,230,118,0.12); color:var(--color-s); border:1px solid rgba(0,230,118,0.3); padding:2px 7px; border-radius:4px; font-weight:700;">已记录</span>' 
+                : '<span style="font-size:10px; background:rgba(255,255,255,0.06); color:var(--text-muted); border:1px solid rgba(255,255,255,0.08); padding:2px 7px; border-radius:4px; font-weight:600;">未游玩</span>';
+
+            // Song Header
+            const header = `
+                <div class="song-header">
+                    <div class="song-title-group">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <div class="song-title" title="${song.title}">${song.title}</div>
+                            ${statusBadge}
+                        </div>
+                        <div class="song-artist" title="${song.artist}">
+                            ${song.artist || "未知曲师"}
+                            ${song.illustrator ? ` · <span style="color:var(--text-muted);">曲绘: ${song.illustrator}</span>` : ''}
+                        </div>
+                    </div>
+                    <span class="song-id-pill" title="${song.id}">${song.id.length > 25 ? song.id.slice(0, 25) + '...' : song.id}</span>
+                </div>
+            `;
+
+            // Diff Tabs with chart constants
+            const diffOrder = ["EZ", "HD", "IN", "AT", "Legacy"];
+            const availableDiffs = Object.keys(song.diffs).sort((a, b) => {
+                const ia = diffOrder.indexOf(a) === -1 ? 99 : diffOrder.indexOf(a);
+                const ib = diffOrder.indexOf(b) === -1 ? 99 : diffOrder.indexOf(b);
+                return ia - ib;
+            });
+
+            let tabsHtml = `<div class="diff-tabs">`;
+            availableDiffs.forEach(d => {
+                const rec = song.diffs[d];
+                const has = rec && rec.has_record;
+                const isActive = (d === activeDiff);
+                const badgeClass = has ? getRatingBadgeClass(rec.rating) : "badge-unplayed";
+                const badgeText = has ? rec.rating : "未玩";
+                const constVal = (song.diff_constants && song.diff_constants[d]) ? `<span style="font-size:10px; opacity:0.8; font-weight:600;">${song.diff_constants[d]}</span>` : '';
+
+                tabsHtml += `
+                    <div class="diff-tab ${isActive ? 'active' : ''}" onclick="switchSongDiff('${escapeJs(song.id)}', '${d}')">
+                        <div style="display:flex; align-items:center; gap:3px;">
+                            <span class="diff-name-${d}">${d}</span>
+                            ${constVal}
+                        </div>
+                        <span class="diff-badge ${badgeClass}">${badgeText}</span>
+                    </div>
+                `;
+            });
+            tabsHtml += `</div>`;
+
+            // Diff Editor
+            const editorHtml = `
+                <div class="diff-editor">
+                    <div class="editor-presets">
+                        <button class="preset-btn" style="color:var(--color-phi);border-color:var(--color-phi);" onclick="applyPreset('${escapeJs(song.id)}', '${activeDiff}', 'phi')">φ (AP 1000k)</button>
+                        <button class="preset-btn" style="color:var(--color-v);" onclick="applyPreset('${escapeJs(song.id)}', '${activeDiff}', 'v_fc')">V (FC 985k)</button>
+                        <button class="preset-btn" onclick="applyPreset('${escapeJs(song.id)}', '${activeDiff}', 'v')">V (965k)</button>
+                        <button class="preset-btn" style="color:var(--color-s);" onclick="applyPreset('${escapeJs(song.id)}', '${activeDiff}', 's')">S (940k)</button>
+                        <button class="preset-btn" style="color:var(--color-a);" onclick="applyPreset('${escapeJs(song.id)}', '${activeDiff}', 'a')">A (900k)</button>
+                        <button class="preset-btn" style="color:var(--color-b);" onclick="applyPreset('${escapeJs(song.id)}', '${activeDiff}', 'b')">B (850k)</button>
+                        <button class="preset-btn" style="color:var(--color-c);" onclick="applyPreset('${escapeJs(song.id)}', '${activeDiff}', 'c')">C (750k)</button>
+                        <button class="preset-btn" style="color:var(--text-muted);" onclick="deleteSongRecord('${escapeJs(song.id)}', '${activeDiff}')">🗑️ 清除</button>
+                    </div>
+
+                    <div class="editor-row">
+                        <div class="input-group">
+                            <label>分数 (0 ~ 1,000,000)</label>
+                            <input type="number" min="0" max="1000000" id="input-score-${escapeId(song.id)}-${activeDiff}" 
+                                value="${currentRec.score || 0}" 
+                                oninput="onScoreChange('${escapeJs(song.id)}', '${activeDiff}')">
+                        </div>
+                        <div class="input-group">
+                            <label>准度 Acc (%)</label>
+                            <input type="number" min="0" max="100" step="0.01" id="input-acc-${escapeId(song.id)}-${activeDiff}" 
+                                value="${currentRec.acc || 0}" 
+                                oninput="onAccChange('${escapeJs(song.id)}', '${activeDiff}')">
+                        </div>
+                        <label class="fc-checkbox">
+                            <input type="checkbox" id="input-fc-${escapeId(song.id)}-${activeDiff}" 
+                                ${currentRec.fc ? 'checked' : ''} 
+                                onchange="onFcChange('${escapeJs(song.id)}', '${activeDiff}')">
+                            FC (全连)
+                        </label>
+                    </div>
+
+                    <input type="range" class="score-slider" min="0" max="1000000" step="1000" 
+                        id="slider-score-${escapeId(song.id)}-${activeDiff}" 
+                        value="${currentRec.score || 0}"
+                        oninput="onSliderChange('${escapeJs(song.id)}', '${activeDiff}')">
+                </div>
+            `;
+
+            card.innerHTML = header + tabsHtml + editorHtml;
+            return card;
+        }
+
+        function escapeJs(str) {
+            return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        }
+
+        function escapeId(str) {
+            return encodeURIComponent(str).replace(/%/g, '_');
+        }
+
+        function switchSongDiff(songId, diff) {
+            activeDiffState[songId] = diff;
+            const song = allSongs.find(s => s.id === songId);
+            if (!song) return;
+            const oldCard = document.getElementById(`song-card-${CSS.escape(songId)}`);
+            if (oldCard) {
+                const newCard = createSongCard(song);
+                oldCard.replaceWith(newCard);
+            }
+        }
+
+        function onScoreChange(songId, diff) {
+            const scoreEl = document.getElementById(`input-score-${escapeId(songId)}-${diff}`);
+            const sliderEl = document.getElementById(`slider-score-${escapeId(songId)}-${diff}`);
+            const fcEl = document.getElementById(`input-fc-${escapeId(songId)}-${diff}`);
+            const accEl = document.getElementById(`input-acc-${escapeId(songId)}-${diff}`);
+            let score = parseInt(scoreEl.value) || 0;
+            if (score > 1000000) score = 1000000;
+            if (score < 0) score = 0;
+            sliderEl.value = score;
+
+            if (score === 1000000) {
+                fcEl.checked = true;
+                accEl.value = "100";
+            }
+            debounceSaveRecord(songId, diff);
+        }
+
+        function onSliderChange(songId, diff) {
+            const scoreEl = document.getElementById(`input-score-${escapeId(songId)}-${diff}`);
+            const sliderEl = document.getElementById(`slider-score-${escapeId(songId)}-${diff}`);
+            scoreEl.value = sliderEl.value;
+            onScoreChange(songId, diff);
+        }
+
+        function onAccChange(songId, diff) {
+            debounceSaveRecord(songId, diff);
+        }
+
+        function onFcChange(songId, diff) {
+            debounceSaveRecord(songId, diff);
+        }
+
+        function applyPreset(songId, diff, preset) {
+            const scoreEl = document.getElementById(`input-score-${escapeId(songId)}-${diff}`);
+            const sliderEl = document.getElementById(`slider-score-${escapeId(songId)}-${diff}`);
+            const accEl = document.getElementById(`input-acc-${escapeId(songId)}-${diff}`);
+            const fcEl = document.getElementById(`input-fc-${escapeId(songId)}-${diff}`);
+
+            const presets = {
+                "phi": { score: 1000000, acc: 100.0, fc: true },
+                "v_fc": { score: 985000, acc: 98.5, fc: true },
+                "v": { score: 965000, acc: 96.5, fc: false },
+                "s": { score: 940000, acc: 94.0, fc: false },
+                "a": { score: 900000, acc: 90.0, fc: false },
+                "b": { score: 850000, acc: 85.0, fc: false },
+                "c": { score: 750000, acc: 75.0, fc: false }
+            };
+
+            const p = presets[preset];
+            if (!p) return;
+
+            scoreEl.value = p.score;
+            sliderEl.value = p.score;
+            accEl.value = p.acc;
+            fcEl.checked = p.fc;
+
+            saveRecord(songId, diff, p.score, p.acc, p.fc ? 1 : 0);
+        }
+
+        let saveTimeout = null;
+        function debounceSaveRecord(songId, diff) {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+                const score = parseInt(document.getElementById(`input-score-${escapeId(songId)}-${diff}`).value) || 0;
+                const acc = parseFloat(document.getElementById(`input-acc-${escapeId(songId)}-${diff}`).value) || 0.0;
+                const fc = document.getElementById(`input-fc-${escapeId(songId)}-${diff}`).checked ? 1 : 0;
+                saveRecord(songId, diff, score, acc, fc);
+            }, 400);
+        }
+
+        async function saveRecord(songId, diff, score, acc, c) {
+            try {
+                const res = await fetch("/api/update_record", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ song_id: songId, diff: diff, score: score, acc: acc, c: c })
+                });
+                const data = await res.json();
+                if (data.status === "ok") {
+                    // Update local state
+                    const song = allSongs.find(s => s.id === songId);
+                    if (song) {
+                        song.diffs[diff] = {
+                            score: score,
+                            acc: acc,
+                            c: c,
+                            fc: (c === 1),
+                            rating: calculateRating(score, c === 1),
+                            has_record: true
+                        };
+                        song.has_records = true;
+                        const oldCard = document.getElementById(`song-card-${CSS.escape(songId)}`);
+                        if (oldCard) {
+                            const newCard = createSongCard(song);
+                            oldCard.replaceWith(newCard);
+                        }
+                    }
+                    fetchStatus();
+                } else {
+                    showToast(data.message, "error");
+                }
+            } catch (err) {
+                console.error("Save record error:", err);
+            }
+        }
+
+        async function deleteSongRecord(songId, diff) {
+            try {
+                const res = await fetch("/api/delete_record", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ song_id: songId, diff: diff })
+                });
+                const data = await res.json();
+                if (data.status === "ok") {
+                    showToast(data.message, "info");
+                    const song = allSongs.find(s => s.id === songId);
+                    if (song) {
+                        song.diffs[diff] = { score: 0, acc: 0, c: 0, fc: false, rating: "未游玩", has_record: false };
+                        song.has_records = Object.values(song.diffs).some(d => d.has_record);
+                        const oldCard = document.getElementById(`song-card-${CSS.escape(songId)}`);
+                        if (oldCard) {
+                            const newCard = createSongCard(song);
+                            oldCard.replaceWith(newCard);
+                        }
+                    }
+                    fetchStatus();
+                }
+            } catch (err) {
+                console.error("Delete record error:", err);
+            }
+        }
+
+        // Batch operations
+        async function submitBatchRecords() {
+            const diffTarget = document.getElementById("batch-diff-target").value;
+            const preset = document.getElementById("batch-preset").value;
+            showToast("正在执行批量修改...", "info");
+            const res = await fetch("/api/batch_records", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ diff_target: diffTarget, preset: preset })
+            });
+            const data = await res.json();
+            if (data.status === "ok") {
+                showToast(data.message, "success");
+                closeModal("batch-modal");
+                await fetchStatus();
+                await fetchSongs();
+            } else {
+                showToast(data.message, "error");
+            }
+        }
+
+        async function submitBatchUnlock() {
+            showToast("正在执行全解锁...", "info");
+            const res = await fetch("/api/batch_unlock", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    unlock_songs: document.getElementById("unlock-songs").checked,
+                    unlock_collections: document.getElementById("unlock-collections").checked,
+                    unlock_illustrations: document.getElementById("unlock-illustrations").checked,
+                    unlock_avatars: document.getElementById("unlock-avatars").checked,
+                    unlock_grades: document.getElementById("unlock-grades").checked
+                })
+            });
+            const data = await res.json();
+            if (data.status === "ok") {
+                showToast(data.message, "success");
+                closeModal("batch-modal");
+                await fetchStatus();
+                await fetchSongs();
+            } else {
+                showToast(data.message, "error");
+            }
+        }
+
+        async function submitCurrencies() {
+            const money = {};
+            for (let i = 0; i < 5; i++) {
+                const val = document.getElementById(`money-${i}`).value;
+                if (val !== "") money[`NumOfMoney${i}`] = val;
+            }
+            const rank = document.getElementById("challenge-rank-input").value;
+            const res = await fetch("/api/currencies", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ money: money, challenge_rank: rank })
+            });
+            const data = await res.json();
+            if (data.status === "ok") {
+                showToast(data.message, "success");
+                closeModal("currency-modal");
+                await fetchStatus();
+            } else {
+                showToast(data.message, "error");
+            }
+        }
+
+        async function submitAddSong() {
+            const songId = document.getElementById("new-song-id").value.trim();
+            if (!songId) return;
+            const res = await fetch("/api/add_song", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ song_id: songId })
+            });
+            const data = await res.json();
+            if (data.status === "ok") {
+                showToast(data.message, "success");
+                document.getElementById("new-song-id").value = "";
+                closeModal("add-song-modal");
+                await fetchStatus();
+                await fetchSongs();
+            } else {
+                showToast(data.message, "error");
+            }
+        }
+
+        // Init & Drag-and-drop support
+        window.addEventListener("dragover", (e) => {
+            e.preventDefault();
+        });
+
+        window.addEventListener("drop", async (e) => {
+            e.preventDefault();
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                const file = e.dataTransfer.files[0];
+                const lowerName = file.name.toLowerCase();
+                if (lowerName.endsWith(".apk")) {
+                    await uploadApkBlob(file, file.name);
+                } else if (lowerName.includes("userdata") || lowerName.startsWith(".")) {
+                    openCloudModal();
+                    const reader = new FileReader();
+                    reader.onload = function(evt) {
+                        document.getElementById("cloud-token-input").value = evt.target.result;
+                        showToast(`已读取 ${file.name}，正在尝试连接云端...`, "info");
+                        connectCloudSave();
+                    };
+                    reader.readAsText(file);
+                } else {
+                    showToast(`正在上传并解包 ${file.name}...`, "info");
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    const res = await fetch("/api/upload", { method: "POST", body: formData });
+                    const data = await res.json();
+                    if (data.status === "ok") {
+                        showToast(data.message, "success");
+                        await fetchStatus();
+                        await fetchSongs();
+                    } else {
+                        showToast(data.message, "error");
+                    }
+                }
+            }
+        });
+
+        window.addEventListener("DOMContentLoaded", async () => {
+            await fetchStatus();
+            await fetchSongs();
+            const hasDb = window.serverHasDatabase || (summaryData && summaryData.total_songs > 0);
+            if (!hasDb && !localStorage.getItem("phigros_apk_onboarded")) {
+                openApkModal();
+            }
+        });
+    </script>
+</body>
+</html>

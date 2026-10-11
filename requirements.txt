@@ -1,0 +1,12 @@
+# Core runtime
+pycryptodome>=3.18.0
+starlette>=0.28.0
+uvicorn>=0.22.0
+python-multipart>=0.0.6
+
+# QR-code login (TapTap device-code flow)
+qrcode>=7.4
+
+# APK catalog extraction. Imported lazily by core/apk_parser.py -- the rest
+# of the program runs without it, but importing an APK requires it.
+UnityPy>=1.10.0
