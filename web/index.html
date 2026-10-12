@@ -641,6 +641,74 @@
 
         #analysis-modal .chart-row .c-score { display: none; }
 
+        /* Unlock manager: a scrollable grid of toggleable items */
+        #unlock-modal .modal-content { overflow: hidden; }
+        #unlock-modal .modal-body { overflow: hidden; min-height: 0; }
+
+        #unlock-list {
+            overflow-y: auto;
+            min-height: 0;
+            padding-right: 4px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 6px;
+            align-content: start;
+        }
+
+        .unlock-item {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 11px;
+            font-size: 12.5px;
+            cursor: pointer;
+            user-select: none;
+            transition: border-color 0.15s, background 0.15s;
+        }
+
+        .unlock-item:hover { border-color: var(--border-hover); }
+
+        .unlock-item.on {
+            border-color: rgba(0, 230, 118, 0.45);
+            background: rgba(0, 230, 118, 0.08);
+        }
+
+        /* A pending change is the one thing the user must be able to see at
+           a glance before committing, so it gets its own colour. */
+        .unlock-item.dirty {
+            border-color: rgba(255, 171, 64, 0.65);
+            background: rgba(255, 171, 64, 0.10);
+        }
+
+        .unlock-item input { accent-color: var(--accent-cyan); cursor: pointer; flex-shrink: 0; }
+        .unlock-item.frozen {
+            opacity: 0.55;
+            cursor: not-allowed;
+            border-style: dashed;
+        }
+        .unlock-item.frozen input { cursor: not-allowed; }
+        .unlock-item .u-count {
+            margin-left: auto; flex-shrink: 0; font-size: 11px;
+            font-variant-numeric: tabular-nums; font-weight: 600;
+        }
+
+        .unlock-item .u-label {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--text-primary);
+        }
+
+        .unlock-item .u-sub {
+            margin-left: auto;
+            font-size: 10px;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
         /* Toast Container */
         #toast-container {
             position: fixed;
@@ -719,6 +787,7 @@
             <button class="btn btn-success" id="btn-export-xml" style="display: none;" onclick="exportSaveXml()" title="导出为本地 PlayerPrefs 加密 XML（云存档同样可用）">📥 下载XML</button>
             <button class="btn" id="btn-export-json" style="display: none;" onclick="exportSaveJson()" title="导出解密后的 gameRecord + gameKey JSON（云存档同样可用）">📄 导出JSON</button>
             <button class="btn btn-accent" id="btn-batch-ops" style="display: none;" onclick="openBatchModal()">⚡ 批量操作 & 解锁</button>
+            <button class="btn" id="btn-unlocks" style="display: none; border-color: rgba(255, 171, 64, 0.45); background: rgba(255, 171, 64, 0.12); color: #ffab40;" onclick="openUnlockModal()">🗝️ 收藏品 & 头像</button>
             <button class="btn" id="btn-analysis" style="display: none; border-color: rgba(0, 230, 118, 0.45); background: rgba(0, 230, 118, 0.12); color: #00e676;" onclick="openAnalysisModal()">📊 数据分析</button>
             <button class="btn" id="btn-currency" style="display: none;" onclick="openCurrencyModal()">💰 货币 & 课题分</button>
             <!-- 仅在「编辑云存档」且 gameProgress 结构可识别时显示 -->
@@ -927,15 +996,67 @@
                 </div>
                 <button class="btn btn-primary" onclick="submitBatchRecords()">立即应用此难度评级</button>
                 <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 6px 0;">
-                <label style="font-weight: 700; color: #fff;">一键全收集 / 全解锁：</label>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
-                    <label class="fc-checkbox"><input type="checkbox" id="unlock-songs" checked> 解锁全部单曲 (0key)</label>
-                    <label class="fc-checkbox"><input type="checkbox" id="unlock-collections" checked> 解锁全部收藏品 (1key & Opened)</label>
-                    <label class="fc-checkbox"><input type="checkbox" id="unlock-illustrations" checked> 解锁全部曲绘 (2key)</label>
-                    <label class="fc-checkbox"><input type="checkbox" id="unlock-avatars" checked> 解锁全部头像 (3key)</label>
-                    <label class="fc-checkbox"><input type="checkbox" id="unlock-grades" checked> 解锁全部 IN/AT 挑战限制 (Grade)</label>
+                <label style="font-weight: 700; color: #fff;">收藏品 / 头像 / 曲绘解锁：</label>
+                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.6;">
+                    已移至 <b style="color:#ffab40;">🗝️ 收藏品 &amp; 头像</b> 管理面板 —— 在那里可以逐项勾选、搜索筛选、
+                    查看每个收藏品的 <b>已收集 / 总数</b>，也可以一键全解锁。
                 </div>
-                <button class="btn btn-accent" onclick="submitBatchUnlock()">执行一键全解锁</button>
+                <button class="btn btn-accent" onclick="closeModal('batch-modal'); openUnlockModal();">打开解锁管理面板</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Unlock manager: per-item collection / avatar control ===== -->
+    <div class="modal-overlay" id="unlock-modal">
+        <div class="modal-content" style="max-width: 860px; max-height: 88vh;">
+            <div class="modal-header">
+                <h2>🗝️ 收藏品 & 头像管理</h2>
+                <button class="close-btn" onclick="closeModal('unlock-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Shown only when the save cannot be re-locked (cloud) -->
+                <div id="unlock-hint" style="display: none; font-size: 12px; line-height: 1.6;
+                     color: #ffd180; background: rgba(255, 171, 64, 0.10);
+                     border: 1px solid rgba(255, 171, 64, 0.35);
+                     border-radius: var(--radius-md); padding: 10px 12px;"></div>
+
+                <!-- Category tabs with live counts -->
+                <div class="view-toggle" id="unlock-tabs" style="flex-wrap: wrap;">
+                    <button class="view-btn active" data-group="collection" onclick="setUnlockTab('collection')">收藏品</button>
+                    <button class="view-btn" data-group="avatar" onclick="setUnlockTab('avatar')">头像</button>
+                    <button class="view-btn" data-group="illustration" onclick="setUnlockTab('illustration')">曲绘</button>
+                    <button class="view-btn" data-group="single" onclick="setUnlockTab('single')">单曲</button>
+                    <button class="view-btn" data-group="grade" onclick="setUnlockTab('grade')">挑战限制</button>
+                </div>
+
+                <!-- Search + bulk actions scoped to the current tab -->
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                    <input type="text" id="unlock-search" placeholder="🔍 搜索名称..." oninput="renderUnlockList()"
+                           style="flex: 1; min-width: 180px; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px 12px; font-size: 13px; border-radius: var(--radius-md); outline: none;">
+                    <select class="filter-select" id="unlock-filter" style="padding: 7px 10px; font-size: 12px;" onchange="renderUnlockList()">
+                        <option value="ALL">全部</option>
+                        <option value="LOCKED">仅未解锁</option>
+                        <option value="UNLOCKED">仅已解锁</option>
+                    </select>
+                    <button class="btn" style="font-size: 12px; padding: 6px 12px;" onclick="toggleVisibleUnlocks(true)">全选本页</button>
+                    <button class="btn" style="font-size: 12px; padding: 6px 12px;" onclick="toggleVisibleUnlocks(false)">全不选本页</button>
+                </div>
+
+                <div id="unlock-count" style="font-size: 12px; color: var(--text-secondary);"></div>
+
+                <div id="unlock-list" style="min-height: 200px;">
+                    <div style="text-align: center; padding: 50px 20px; color: var(--text-secondary);">正在载入...</div>
+                </div>
+
+                <div style="display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; border-top: 1px solid var(--border-color); padding-top: 14px;">
+                    <span id="unlock-pending" style="font-size: 12px; color: var(--text-secondary);">没有未保存的更改</span>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="btn" style="border-color: rgba(255,171,64,0.45); color: #ffab40;"
+                                onclick="submitBatchUnlock()">一键全解锁（全部分类）</button>
+                        <button class="btn" onclick="resetUnlockChanges()">撤销更改</button>
+                        <button class="btn btn-primary" onclick="applyUnlockChanges()">应用更改</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1471,6 +1592,19 @@
                 let filename = fallbackFilename;
                 const match = /filename="?([^"]+)"?/.exec(disposition);
                 if (match) filename = match[1];
+
+                // A save rebuilt from a cloud package has no Unity-internal
+                // keys. The file is valid, but replacing the on-device save
+                // with it can make the game start fresh, so say so instead
+                // of handing over a download that looks interchangeable.
+                if (resp.headers.get("X-Upsm-Partial-Save")) {
+                    alert("注意：当前编辑的是云存档。\n\n" +
+                          "云存档格式不包含 Unity 内部字段（分辨率、版本标记等）与" +
+                          "挑战限制、章节解锁等本地专有数据，导出的 XML 缺少这些内容。\n\n" +
+                          "它可以用于备份与查看，但【不建议】直接替换手机上的存档文件，" +
+                          "否则游戏可能无法正确识别。\n\n" +
+                          "如需修改手机存档，请直接载入手机上的 XML 文件进行编辑。");
+                }
 
                 const blob = await resp.blob();
                 const objectUrl = URL.createObjectURL(blob);
@@ -2427,7 +2561,7 @@
                     updateCloudSaveButtons(hasSave);
 
                     // 未有有效存档时，不显示【下载XML】【导出JSON】【数据分析】【批量操作 & 解锁】【货币 & 课题分】
-                    const saveActionIds = ["btn-export-xml", "btn-export-json", "btn-analysis", "btn-batch-ops", "btn-currency"];
+                    const saveActionIds = ["btn-export-xml", "btn-export-json", "btn-analysis", "btn-batch-ops", "btn-unlocks", "btn-currency"];
                     saveActionIds.forEach(id => {
                         const el = document.getElementById(id);
                         if (el) {
@@ -2700,6 +2834,249 @@
                 frag.appendChild(card);
             });
             container.appendChild(frag);
+        }
+
+        // ===== Unlock manager =====
+        // Per-item control over collections / avatars / illustrations /
+        // songs / grades. Changes are staged locally and applied in one
+        // request, so the user can review before committing.
+        let unlockGroups = null;
+        let unlockTab = "collection";
+        let unlockPending = {};   // save_key -> desired boolean
+        // Cloud uploads merge additively, so a cloud save can only gain
+        // unlocks. Locking is a local-save-only feature.
+        let unlockLockSupported = true;
+
+        const UNLOCK_LABELS = {
+            collection: "收藏品", avatar: "头像",
+            illustration: "曲绘", single: "单曲", grade: "挑战限制"
+        };
+
+        async function openUnlockModal() {
+            openModal("unlock-modal");
+            unlockPending = {};
+            document.getElementById("unlock-list").innerHTML =
+                `<div style="grid-column:1/-1;text-align:center;padding:50px 20px;color:var(--text-secondary);">正在载入...</div>`;
+            try {
+                const resp = await fetch("/api/unlock_catalog");
+                const data = await resp.json();
+                if (handleNeedApk(data)) {
+                    closeModal("unlock-modal");
+                    return;
+                }
+                if (data.status !== "ok") {
+                    document.getElementById("unlock-list").innerHTML =
+                        `<div style="grid-column:1/-1;text-align:center;padding:50px 20px;color:var(--text-secondary);">${escapeHtml(data.message || "载入失败")}</div>`;
+                    return;
+                }
+                unlockGroups = data.groups;
+                unlockLockSupported = data.lock_supported !== false;
+                updateUnlockTabCounts(data.summary);
+                renderUnlockHint();
+                renderUnlockList();
+            } catch (err) {
+                document.getElementById("unlock-list").innerHTML =
+                    `<div style="grid-column:1/-1;text-align:center;padding:50px 20px;color:var(--text-secondary);">载入失败：${escapeHtml(err.message)}</div>`;
+            }
+        }
+
+        function updateUnlockTabCounts(summary) {
+            document.querySelectorAll("#unlock-tabs .view-btn").forEach(btn => {
+                const g = btn.dataset.group;
+                const s = (summary || {})[g];
+                btn.innerText = s
+                    ? `${UNLOCK_LABELS[g]} ${s.unlocked}/${s.total}`
+                    : UNLOCK_LABELS[g];
+            });
+        }
+
+        function setUnlockTab(group) {
+            unlockTab = group;
+            document.querySelectorAll("#unlock-tabs .view-btn").forEach(btn => {
+                btn.classList.toggle("active", btn.dataset.group === group);
+            });
+            renderUnlockList();
+        }
+
+        /** Effective state = pending change if any, else the saved state. */
+        function unlockStateOf(item) {
+            return Object.prototype.hasOwnProperty.call(unlockPending, item.save_key)
+                ? unlockPending[item.save_key]
+                : !!item.unlocked;
+        }
+
+        function visibleUnlockItems() {
+            if (!unlockGroups) return [];
+            const q = (document.getElementById("unlock-search").value || "").toLowerCase().trim();
+            const filter = document.getElementById("unlock-filter").value;
+            return (unlockGroups[unlockTab] || []).filter(it => {
+                if (q && !(it.label || "").toLowerCase().includes(q)
+                      && !(it.key || "").toLowerCase().includes(q)) return false;
+                const on = unlockStateOf(it);
+                if (filter === "LOCKED" && on) return false;
+                if (filter === "UNLOCKED" && !on) return false;
+                return true;
+            });
+        }
+
+        function renderUnlockList() {
+            const box = document.getElementById("unlock-list");
+            if (!unlockGroups) return;
+            const items = visibleUnlockItems();
+            const all = unlockGroups[unlockTab] || [];
+            const unlocked = all.filter(unlockStateOf).length;
+
+            document.getElementById("unlock-count").innerText =
+                `${UNLOCK_LABELS[unlockTab]}：已解锁 ${unlocked} / ${all.length}　|　当前显示 ${items.length} 项`;
+
+            if (items.length === 0) {
+                box.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--text-secondary);">没有符合条件的项目</div>`;
+                updateUnlockPendingLabel();
+                return;
+            }
+
+            const frag = document.createDocumentFragment();
+            items.forEach(it => {
+                const on = unlockStateOf(it);
+                const dirty = Object.prototype.hasOwnProperty.call(unlockPending, it.save_key);
+                const el = document.createElement("label");
+                el.className = "unlock-item" + (on ? " on" : "") + (dirty ? " dirty" : "");
+                el.title = it.save_key;
+                const sub = (it.key && it.key !== it.label) ? `<span class="u-sub">${escapeHtml(it.key)}</span>` : "";
+                // A collection is one save entry holding how many of its
+                // sub-items are collected, so show that rather than a bare
+                // tick that would hide "2 of 7".
+                let badge = "";
+                if (it.total > 1) {
+                    const shown = dirty ? (on ? it.total : 0) : (it.count || 0);
+                    const hue = shown >= it.total ? "var(--accent-cyan)"
+                              : shown > 0 ? "#ffab40" : "var(--text-secondary)";
+                    badge = `<span class="u-count" style="color:${hue};">${shown}/${it.total}</span>`;
+                }
+                // On a cloud save an unlocked item cannot be un-ticked,
+                // so the control is disabled rather than silently ignored.
+                const frozen = !unlockLockSupported && on;
+                if (frozen) el.classList.add("frozen");
+                el.innerHTML = `
+                    <input type="checkbox" ${on ? "checked" : ""} ${frozen ? "disabled" : ""}>
+                    <span class="u-label">${escapeHtml(it.label)}</span>${sub}${badge}
+                `;
+                if (frozen) {
+                    el.title = (it.save_key || "") + "  —— 云存档无法取消解锁";
+                } else {
+                    el.querySelector("input").onchange = (e) => {
+                        toggleUnlock(it, e.target.checked);
+                    };
+                }
+                frag.appendChild(el);
+            });
+            box.innerHTML = "";
+            box.appendChild(frag);
+            updateUnlockPendingLabel();
+        }
+
+        function renderUnlockHint() {
+            const el = document.getElementById("unlock-hint");
+            if (!el) return;
+            if (unlockLockSupported) { el.style.display = "none"; return; }
+            el.style.display = "block";
+            el.innerHTML = "☁️ <b>当前为云存档，只能添加解锁、无法取消解锁。</b>" +
+                "上传时云端按「取最大值」合并，取消的解锁会被服务器忽略。" +
+                "如需锁定，请改为载入手机本地的 XML 存档进行编辑。";
+        }
+
+        function toggleUnlock(item, want) {
+            if (!want && !unlockLockSupported) {
+                showToast("云存档无法取消解锁，请载入本地 XML 存档后操作", "error");
+                renderUnlockList();   // snap the checkbox back
+                return;
+            }
+            if (!!item.unlocked === !!want) {
+                // Back to the saved state: no longer a pending change.
+                delete unlockPending[item.save_key];
+            } else {
+                unlockPending[item.save_key] = !!want;
+            }
+            renderUnlockList();
+        }
+
+        function toggleVisibleUnlocks(want) {
+            if (!want && !unlockLockSupported) {
+                showToast("云存档无法取消解锁，请载入本地 XML 存档后操作", "error");
+                return;
+            }
+            visibleUnlockItems().forEach(it => {
+                if (!!it.unlocked === !!want) delete unlockPending[it.save_key];
+                else unlockPending[it.save_key] = !!want;
+            });
+            renderUnlockList();
+        }
+
+        function updateUnlockPendingLabel() {
+            const n = Object.keys(unlockPending).length;
+            const el = document.getElementById("unlock-pending");
+            if (!el) return;
+            if (n === 0) {
+                el.innerText = "没有未保存的更改";
+                el.style.color = "var(--text-secondary)";
+            } else {
+                const on = Object.values(unlockPending).filter(Boolean).length;
+                el.innerText = `${n} 项待应用（解锁 ${on}，锁定 ${n - on}）`;
+                el.style.color = "#ffab40";
+            }
+        }
+
+        function resetUnlockChanges() {
+            unlockPending = {};
+            renderUnlockList();
+            showToast("已撤销未保存的更改", "info");
+        }
+
+        async function applyUnlockChanges() {
+            // Collections store a count, not a flag, so the item's sub-item
+            // total has to travel with the change.
+            const byKey = {};
+            Object.values(unlockGroups || {}).forEach(list =>
+                (list || []).forEach(it => { byKey[it.save_key] = it; }));
+            const changes = Object.entries(unlockPending)
+                .map(([save_key, unlocked]) => {
+                    const it = byKey[save_key];
+                    return (it && it.total > 1)
+                        ? { save_key, unlocked, total: it.total }
+                        : { save_key, unlocked };
+                });
+            if (changes.length === 0) {
+                showToast("没有需要应用的更改", "info");
+                return;
+            }
+            try {
+                const res = await fetch("/api/set_unlocks", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ changes })
+                });
+                const data = await res.json();
+                if (data.status !== "ok") {
+                    showToast(data.message || "应用失败", "error");
+                    return;
+                }
+                showToast(data.message, "success");
+                unlockPending = {};
+                // Re-read so the panel reflects what was actually written.
+                const resp = await fetch("/api/unlock_catalog");
+                const fresh = await resp.json();
+                if (fresh.status === "ok") {
+                    unlockGroups = fresh.groups;
+                    unlockLockSupported = fresh.lock_supported !== false;
+                    updateUnlockTabCounts(fresh.summary);
+                    renderUnlockHint();
+                }
+                renderUnlockList();
+                await fetchStatus();
+                await fetchSongs();
+            } catch (err) {
+                showToast("应用失败：" + err.message, "error");
+            }
         }
 
         // ===== Analysis panel =====
@@ -3297,26 +3674,52 @@
         }
 
         async function submitBatchUnlock() {
+            // Lives in the unlock manager now: it writes straight to the
+            // save, so staged per-item edits would be silently overwritten.
+            const pending = Object.keys(unlockPending).length;
+            if (pending > 0 && !confirm(
+                    `有 ${pending} 项未应用的更改，一键全解锁会直接写入存档并丢弃它们。\n继续吗？`)) {
+                return;
+            }
+            if (!confirm("将解锁全部单曲、收藏品、曲绘、头像与 IN/AT 挑战限制。\n继续吗？")) return;
+
             showToast("正在执行全解锁...", "info");
-            const res = await fetch("/api/batch_unlock", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    unlock_songs: document.getElementById("unlock-songs").checked,
-                    unlock_collections: document.getElementById("unlock-collections").checked,
-                    unlock_illustrations: document.getElementById("unlock-illustrations").checked,
-                    unlock_avatars: document.getElementById("unlock-avatars").checked,
-                    unlock_grades: document.getElementById("unlock-grades").checked
-                })
-            });
-            const data = await res.json();
-            if (data.status === "ok") {
+            try {
+                const res = await fetch("/api/batch_unlock", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        unlock_songs: true,
+                        unlock_collections: true,
+                        unlock_illustrations: true,
+                        unlock_avatars: true,
+                        unlock_grades: true
+                    })
+                });
+                const data = await res.json();
+                if (handleNeedApk(data)) return;
+                if (data.status !== "ok") {
+                    showToast(data.message || "全解锁失败", "error");
+                    return;
+                }
                 showToast(data.message, "success");
-                closeModal("batch-modal");
+                unlockPending = {};
+                // Refresh the panel in place when it is the caller, so the
+                // counts reflect what was actually written.
+                if (document.getElementById("unlock-modal").style.display === "flex") {
+                    const fresh = await (await fetch("/api/unlock_catalog")).json();
+                    if (fresh.status === "ok") {
+                        unlockGroups = fresh.groups;
+                        updateUnlockTabCounts(fresh.summary);
+                        renderUnlockList();
+                    }
+                } else {
+                    closeModal("batch-modal");
+                }
                 await fetchStatus();
                 await fetchSongs();
-            } else {
-                showToast(data.message, "error");
+            } catch (err) {
+                showToast("全解锁失败：" + err.message, "error");
             }
         }
 

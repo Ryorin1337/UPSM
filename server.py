@@ -550,6 +550,64 @@ async def api_batch_unlock(request):
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
+async def api_unlock_catalog(request):
+    """
+    Every unlockable the imported catalog knows about, with its state.
+
+    This is what the per-item unlock manager renders; the names come from
+    the APK's own keyStore, so the save keys written back are the ones the
+    game actually reads.
+    """
+    if len(current_save.data_map) == 0:
+        return JSONResponse({"status": "error", "message": "请先上传或载入存档文件"}, status_code=400)
+
+    guard = require_catalog()
+    if guard is not None:
+        return guard
+
+    try:
+        catalog = current_save.unlock_catalog()
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": f"读取解锁列表失败：{e}"}, status_code=500)
+
+    # The parser already reports the summary: a collection counts as
+    # unlocked only when every sub-item is, which cannot be re-derived
+    # correctly from the group lists alone.
+    return JSONResponse({
+        "status": "ok",
+        "groups": catalog.get("groups", {}),
+        "summary": catalog.get("summary", {}),
+        # Cloud uploads merge additively, so a cloud save cannot be
+        # re-locked; the client greys out un-ticking instead of letting
+        # the user stage a change that would be silently dropped.
+        "lock_supported": catalog.get("lock_supported", True),
+        "is_cloud_save": catalog.get("is_cloud_save", False),
+    })
+
+
+async def api_set_unlocks(request):
+    """Applies individual unlock / lock changes from the unlock manager."""
+    if len(current_save.data_map) == 0:
+        return JSONResponse({"status": "error", "message": "请先上传或载入存档文件"}, status_code=400)
+    try:
+        data = await request.json()
+        changes = data.get("changes") or []
+        if not isinstance(changes, list):
+            return JSONResponse({"status": "error", "message": "changes 必须是数组"}, status_code=400)
+        if not changes:
+            return JSONResponse({"status": "ok", "message": "没有需要应用的更改", "applied": 0})
+
+        result = current_save.set_unlocks(changes)
+        refused = result.get("refused", 0)
+        message = f"已应用 {result['applied']} 项更改"
+        if refused:
+            # Say so plainly: a silently dropped lock is worse than none.
+            message += f"；{refused} 项锁定被拒绝（云存档只能增加解锁，无法取消）"
+        return JSONResponse({"status": "ok", "message": message, **result})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
 async def api_currencies(request):
     if len(current_save.data_map) == 0:
         return JSONResponse({"status": "error", "message": "请先上传或载入存档文件"}, status_code=400)
@@ -588,11 +646,18 @@ async def api_export_xml(request):
         return JSONResponse({"status": "error", "message": "请先上传或载入存档文件"}, status_code=400)
     try:
         xml_bytes = current_save.export_xml()
-        return Response(
-            xml_bytes,
-            media_type="application/xml",
-            headers={"Content-Disposition": 'attachment; filename="com.PigeonGames.Phigros.v2.playerprefs.xml"'}
-        )
+        headers = {
+            "Content-Disposition": 'attachment; filename="com.PigeonGames.Phigros.v2.playerprefs.xml"'
+        }
+        # A cloud package carries no Unity-internal keys, so an XML built
+        # from one is NOT a drop-in replacement for the on-device file.
+        # The download still succeeds -- it is a valid save -- but the
+        # client needs to know, or the user silently overwrites a working
+        # local save with one the game may not fully accept.
+        missing = current_save.missing_local_scaffolding()
+        if missing:
+            headers["X-Upsm-Partial-Save"] = str(len(missing))
+        return Response(xml_bytes, media_type="application/xml", headers=headers)
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
@@ -1114,6 +1179,8 @@ routes = [
     Route("/api/delete_record", api_delete_record, methods=["POST"]),
     Route("/api/batch_records", api_batch_records, methods=["POST"]),
     Route("/api/batch_unlock", api_batch_unlock, methods=["POST"]),
+    Route("/api/unlock_catalog", api_unlock_catalog, methods=["GET"]),
+    Route("/api/set_unlocks", api_set_unlocks, methods=["POST"]),
     Route("/api/currencies", api_currencies, methods=["POST"]),
     Route("/api/add_song", api_add_song, methods=["POST"]),
     Route("/api/export_xml", api_export_xml, methods=["GET"]),

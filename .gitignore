@@ -39,6 +39,9 @@ venv.bak/
 # Game save files, user personal backups & locally extracted game data (Privacy & Copyright)
 *.apk
 save.xml
+# Unity PlayerPrefs local saves (any package / any name)
+*playerprefs*.xml
+*.playerprefs.xml
 decrypted_save.json
 data/phigros_data.json
 
@@ -53,3 +56,13 @@ Phigrsaves/
 # User credentials & cloud save privacy
 *.save
 backups/
+
+# Local verification artifacts & database backups (contain personal save data)
+.verify_*.xml
+.cmp_*.xml
+*.bak
+data/*.json.bak
+
+# Cloned reference repos
+Phi-LocalAction-python/
+phi_resource/

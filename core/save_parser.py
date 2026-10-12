@@ -5,6 +5,7 @@ Handles parsing, modifying, and serializing Phigros PlayerPrefs save data.
 import os
 import json
 import re
+import unicodedata
 import xml.etree.ElementTree as ET
 from urllib.parse import unquote, quote
 from typing import Dict, Any, List, Optional, Tuple
@@ -62,6 +63,25 @@ class PhigrosSave:
         self._cloud_parsed = None
         self._cloud_package = None
         self._cloud_raw_bytes = None
+
+    @property
+    def is_cloud_save(self) -> bool:
+        """True when the loaded save came from a cloud .save package."""
+        return self._cloud_package is not None or self._cloud_parsed is not None
+
+    @property
+    def lock_supported(self) -> bool:
+        """
+        Whether this save can have unlocks REMOVED.
+
+        Only a local save can. The cloud format merges additively on
+        upload: a key whose value is <= 0 is skipped outright, and
+        surviving keys are combined with max(current, incoming), so an
+        unlock can never be withdrawn -- re-locking appears to work in the
+        editor and is silently discarded on upload. Rather than let that
+        happen, locking is refused for cloud saves.
+        """
+        return not self.is_cloud_save
 
     def unpack_any(self, file_path_or_bytes, filename: str = "") -> str:
         """
@@ -939,6 +959,321 @@ class PhigrosSave:
         self.modified = True
         return updated_count
 
+    # ------------------------------------------------------------------
+    #  Unlock keys
+    # ------------------------------------------------------------------
+    #  The save stores unlocks as prefixed PlayerPrefs entries:
+    #     0key<name>  single (song) unlock      value "1"
+    #     1key<name>  collection                value = COUNT of sub-items
+    #     2key<name>  illustration              value "1"
+    #     3key<name>  avatar                    value "1"
+    #  plus "<key>CollectionTextOpened" (its own count) and
+    #  "<normalised title><DIFF>SGrade" (value "True"/"False").
+    #
+    #  Verified against a real save (870 entries):
+    #    * 1key values run 1..6 and never exceed the catalog's sub-item
+    #      count for that key -- so a collection is ONE save entry holding a
+    #      count, NOT one entry per sub-item. There is no ".<subIndex>"
+    #      suffix anywhere in the save.
+    #    * CollectionTextOpened tracks separately (one key differed from its
+    #      1key value), so it is read and written as its own counter.
+    #    * 0key/2key/3key names come from the APK keyStore, never from song
+    #      display titles -- a different namespace. All 68 0key and all 5
+    #      3key names in the real save matched the catalog exactly.
+    #    * Grade keys ARE built from the display title, stripped to letters
+    #      and decimal digits (10/10 matched; keeps Greek, drops the
+    #      superscript in "Cuvism3").
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def grade_key_title(title: str) -> str:
+        """
+        Title as the save spells it inside a "<title><DIFF>SGrade" key:
+        Unicode letters and decimal digits only.
+
+        Verified against every Grade entry in a real save. A plain
+        [^0-9A-Za-z...] filter is NOT equivalent -- it erases non-Latin
+        titles such as the Greek "Poseidon" entirely.
+        """
+        out = []
+        for ch in title:
+            cat = unicodedata.category(ch)
+            if cat[0] == "L" or cat == "Nd":
+                out.append(ch)
+        return "".join(out)
+
+    def _collection_totals(self, catalog: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+        """
+        Collapses the catalog's collection rows to one record per key.
+
+        The catalog lists a row per sub-item sharing a `key`; `sub_index`
+        runs from 1, so the number of sub-items is the highest sub_index
+        seen. The title comes from the first row, matching the reference
+        extractor.
+        """
+        out: Dict[str, Dict[str, Any]] = {}
+        for col in catalog.get("collections", []) or []:
+            k = col.get("key")
+            if not k:
+                continue
+            try:
+                sub = int(col.get("sub_index", 1) or 1)
+            except (TypeError, ValueError):
+                sub = 1
+            rec = out.get(k)
+            if rec is None:
+                out[k] = {"key": k, "title": col.get("title") or k, "total": max(sub, 1)}
+            else:
+                rec["total"] = max(rec["total"], sub)
+        return out
+
+    def _illustration_keys(self, catalog: Dict[str, Any]) -> List[str]:
+        """
+        Every name that can carry a "2key" entry.
+
+        The catalog stores `illustration_keys` already filtered against
+        `single_keys` (the extractor drops the overlap to avoid duplicate
+        lines in its own output), but the real save proves illustrations
+        exist for single keys too -- 26 of 69 "2key" entries were single
+        names, plus "Introduction". Leaving them out made those unlocks
+        invisible to the UI.
+        """
+        seen = set()
+        names: List[str] = []
+        for k in (list(catalog.get("illustration_keys", []) or [])
+                  + list(catalog.get("single_keys", []) or [])
+                  + ["Introduction"]):
+            if k and k not in seen:
+                seen.add(k)
+                names.append(k)
+        return names
+
+    def _entry_val(self, save_key: str) -> Optional[str]:
+        item = self.data_map.get(save_key)
+        return None if item is None else item.get("val")
+
+    def _flag_on(self, save_key: str) -> bool:
+        """
+        Whether a "1"-style unlock flag is set.
+
+        An earlier version wrote "0" to lock things, which the game ignores
+        (it tests for the key's presence). Such leftovers must still read as
+        locked here, or the UI would show them unlocked and refuse to let
+        the user clear them.
+        """
+        val = self._entry_val(save_key)
+        if val is None:
+            return False
+        return str(val).strip() not in ("", "0", "False", "false")
+
+    @staticmethod
+    def _as_count(val: Optional[str]) -> int:
+        if val is None:
+            return 0
+        try:
+            return max(0, int(str(val).strip()))
+        except (TypeError, ValueError):
+            return 0
+
+    def unlock_catalog(self) -> Dict[str, Any]:
+        """
+        Every unlockable the imported catalog knows about, with its current
+        state in this save. This is what the per-item unlock UI renders.
+        """
+        catalog = load_database()
+        groups: Dict[str, List[Dict[str, Any]]] = {
+            "single": [], "collection": [], "illustration": [], "avatar": [], "grade": []
+        }
+
+        for k in sorted(catalog.get("single_keys", []) or []):
+            sk = "0key" + k
+            groups["single"].append({
+                "key": k, "label": k, "save_key": sk,
+                "unlocked": self._flag_on(sk),
+            })
+
+        for rec in sorted(self._collection_totals(catalog).values(), key=lambda r: r["key"]):
+            k = rec["key"]
+            total = rec["total"]
+            sk = "1key" + k
+            tk = k + "CollectionTextOpened"
+            count = self._as_count(self._entry_val(sk))
+            groups["collection"].append({
+                "key": k,
+                "label": rec["title"],
+                "save_key": sk,
+                "total": total,
+                "count": min(count, total),
+                # "unlocked" means fully collected, so the UI's toggle and
+                # its "x / y" badge cannot disagree.
+                "unlocked": count >= total,
+                "partial": 0 < count < total,
+                "text_key": tk,
+                "text_count": min(self._as_count(self._entry_val(tk)), total),
+            })
+
+        for k in sorted(self._illustration_keys(catalog)):
+            sk = "2key" + k
+            groups["illustration"].append({
+                "key": k, "label": k, "save_key": sk,
+                "unlocked": self._flag_on(sk),
+            })
+
+        for k in sorted(catalog.get("avatars", []) or []):
+            sk = "3key" + k
+            groups["avatar"].append({
+                "key": k, "label": k, "save_key": sk,
+                "unlocked": self._flag_on(sk),
+            })
+
+        for song in (catalog.get("songs", {}) or {}).values():
+            title = song.get("title") or ""
+            stem = self.grade_key_title(title)
+            if not stem:
+                continue
+            diffs = song.get("difficulties", {}) or {}
+            avail = song.get("available_diffs", []) or []
+            for diff in ("IN", "AT"):
+                if diff == "AT" and diff not in diffs and diff not in avail:
+                    continue
+                sk = stem + diff + "SGrade"
+                groups["grade"].append({
+                    "key": stem + "|" + diff,
+                    "label": title + " · " + diff,
+                    "save_key": sk,
+                    "unlocked": str(self._entry_val(sk)).lower() == "true",
+                })
+        groups["grade"].sort(key=lambda g: g["label"])
+
+        summary = {}
+        for name, items in groups.items():
+            summary[name] = {
+                "total": len(items),
+                "unlocked": sum(1 for i in items if i.get("unlocked")),
+            }
+        return {
+            "groups": groups,
+            "summary": summary,
+            # The UI disables un-ticking when locking cannot be expressed.
+            "lock_supported": self.lock_supported,
+            "is_cloud_save": self.is_cloud_save,
+        }
+
+    def _write_entry(self, save_key: str, val: str) -> bool:
+        """Creates or updates one entry. True when something changed."""
+        item = self.data_map.get(save_key)
+        if item is None:
+            item = {"tag": "string", "name": save_key, "val": val, "is_enc": True}
+            self.raw_items.append(item)
+            self.data_map[save_key] = item
+            return True
+        if item.get("val") != val:
+            item["val"] = val
+            return True
+        return False
+
+    def _remove_entry(self, save_key: str) -> bool:
+        """Deletes one entry outright. True when something was removed."""
+        if save_key not in self.data_map:
+            return False
+        del self.data_map[save_key]
+        self.raw_items = [i for i in self.raw_items if i.get("name") != save_key]
+        return True
+
+    def set_unlocks(self, changes: List[Dict[str, Any]]) -> Dict[str, int]:
+        """
+        Applies individual unlock/lock changes.
+
+        Each change is {save_key, unlocked}, optionally with {count, total}
+        for a collection.
+
+        Locking REMOVES the entry rather than writing "0". Verified against
+        a real save: across 306 key-family entries (0key/1key/2key/3key and
+        CollectionTextOpened) not one holds 0 or an empty value -- the game
+        represents "locked" as the key being absent, so a "0" still reads as
+        unlocked and the lock silently does nothing. Grade keys are the sole
+        exception: they really do store "True"/"False", and the real save
+        contains an explicit "False".
+
+        Locking is a LOCAL-ONLY operation. For a cloud save the upload
+        merge is additive (values <= 0 are dropped, survivors combined with
+        max()), so a lock would be silently discarded -- it is reported as
+        refused instead, in "refused", rather than pretending to succeed.
+        """
+        applied = 0
+        skipped = 0
+        refused = 0
+        can_lock = self.lock_supported
+        for ch in changes:
+            save_key = (ch.get("save_key") or "").strip()
+            if not save_key:
+                skipped += 1
+                continue
+            want = bool(ch.get("unlocked"))
+
+            is_grade = save_key.endswith("SGrade")
+            is_collection = (save_key.startswith("1key")
+                             or save_key.endswith("CollectionTextOpened"))
+
+            # How many sub-items a collection has, for a partial count.
+            total = 1
+            if is_collection:
+                try:
+                    total = max(1, int(ch.get("total") or 1))
+                except (TypeError, ValueError):
+                    total = 1
+
+            # A collection can be set to a partial count, which is still an
+            # unlock -- only a count of 0 means "locked".
+            partial: Optional[int] = None
+            if is_collection and ch.get("count") is not None:
+                try:
+                    partial = max(0, min(int(ch["count"]), total))
+                except (TypeError, ValueError):
+                    partial = None
+                if partial is not None:
+                    want = partial > 0
+
+            # Any downgrade -- a full lock, or a collection's count going
+            # down -- is impossible to express through the cloud upload.
+            if not can_lock:
+                is_downgrade = not want
+                if is_collection and partial is not None:
+                    is_downgrade = partial < self._as_count(self._entry_val(save_key))
+                if is_downgrade:
+                    refused += 1
+                    continue
+
+            if not want and not is_grade:
+                # Locked == key absent. Writing "0" would read as unlocked.
+                changed = self._remove_entry(save_key)
+                if save_key.startswith("1key"):
+                    if self._remove_entry(save_key[4:] + "CollectionTextOpened"):
+                        changed = True
+            else:
+                if is_grade:
+                    val = "True" if want else "False"
+                elif is_collection:
+                    val = str(partial if partial is not None else total)
+                else:
+                    val = "1"
+
+                changed = self._write_entry(save_key, val)
+                # A collection's text flag follows its unlock, so the player
+                # is not left with a collected item whose text is sealed.
+                if save_key.startswith("1key"):
+                    if self._write_entry(save_key[4:] + "CollectionTextOpened", val):
+                        changed = True
+
+            if changed:
+                applied += 1
+            else:
+                skipped += 1
+
+        if applied:
+            self.modified = True
+        return {"applied": applied, "skipped": skipped, "refused": refused}
+
     def batch_unlock(
         self,
         unlock_songs: bool = True,
@@ -948,96 +1283,77 @@ class PhigrosSave:
         unlock_grades: bool = True
     ) -> Dict[str, int]:
         """
-        Batch unlocks game items using both existing save keys and the full APK game catalog.
+        Unlocks everything the imported catalog knows about.
+
+        Counts report items actually changed, so re-running on an already
+        unlocked save reports zeros rather than inflated numbers.
         """
         catalog = load_database()
         counts = {"songs": 0, "collections": 0, "illustrations": 0, "avatars": 0, "grades": 0}
 
-        def _ensure_entry(key_name: str, val: str) -> bool:
-            if key_name in self.data_map:
-                if self.data_map[key_name].get("val") != val:
-                    self.data_map[key_name]["val"] = val
-                    return True
-                return False
-            else:
-                item = {"tag": "string", "name": key_name, "val": val, "is_enc": True}
-                self.raw_items.append(item)
-                self.data_map[key_name] = item
-                return True
-
-        # 1. Unlock songs (0key)
         if unlock_songs:
-            for k, item in self.data_map.items():
+            for k in catalog.get("single_keys", []) or []:
+                if self._write_entry("0key" + k, "1"):
+                    counts["songs"] += 1
+            # Anything already in the save but not in the catalog still gets
+            # unlocked, so an outdated catalog cannot silently skip entries.
+            for k, item in list(self.data_map.items()):
                 if k.startswith("0key") and item.get("val") != "1":
                     item["val"] = "1"
                     counts["songs"] += 1
 
-            for k in catalog.get("single_keys", []):
-                if _ensure_entry(f"0key{k}", "1"):
-                    counts["songs"] += 1
-
-            for song in catalog.get("songs", {}).values():
-                title = song.get("title", "")
-                if title and _ensure_entry(f"0key{title}", "1"):
-                    counts["songs"] += 1
-
-        # 2. Unlock collections (1key & opened)
         if unlock_collections:
-            for k, item in self.data_map.items():
-                if k.startswith("1key") and item.get("val") != "1":
-                    item["val"] = "1"
+            totals = self._collection_totals(catalog)
+            for rec in totals.values():
+                full = str(rec["total"])
+                if self._write_entry("1key" + rec["key"], full):
                     counts["collections"] += 1
-                elif k.endswith("CollectionTextOpened") and item.get("val") == "0":
-                    item["val"] = "1"
-                    counts["collections"] += 1
+                # The text flag is part of the same item to the player, so
+                # it is not counted separately.
+                self._write_entry(rec["key"] + "CollectionTextOpened", full)
 
-            for col in catalog.get("collections", []):
-                k = col.get("key")
-                if k:
-                    if _ensure_entry(f"1key{k}", "1"):
-                        counts["collections"] += 1
-                    if _ensure_entry(f"{k}CollectionTextOpened", "1"):
+            for k, item in list(self.data_map.items()):
+                if k.startswith("1key") and k[4:] not in totals:
+                    # Unknown to the catalog: its stored count is the only
+                    # safe upper bound, so only a locked entry is touched.
+                    if self._as_count(item.get("val")) < 1:
+                        item["val"] = "1"
                         counts["collections"] += 1
 
-        # 3. Unlock illustrations (2key)
         if unlock_illustrations:
-            for k, item in self.data_map.items():
+            for k in self._illustration_keys(catalog):
+                if self._write_entry("2key" + k, "1"):
+                    counts["illustrations"] += 1
+            for k, item in list(self.data_map.items()):
                 if k.startswith("2key") and item.get("val") != "1":
                     item["val"] = "1"
                     counts["illustrations"] += 1
 
-            for k in catalog.get("illustration_keys", []):
-                if _ensure_entry(f"2key{k}", "1"):
-                    counts["illustrations"] += 1
-
-        # 4. Unlock avatars (3key)
         if unlock_avatars:
-            for k, item in self.data_map.items():
+            for k in catalog.get("avatars", []) or []:
+                if self._write_entry("3key" + k, "1"):
+                    counts["avatars"] += 1
+            for k, item in list(self.data_map.items()):
                 if k.startswith("3key") and item.get("val") != "1":
                     item["val"] = "1"
                     counts["avatars"] += 1
 
-            for k in catalog.get("avatars", []):
-                if _ensure_entry(f"3key{k}", "1"):
-                    counts["avatars"] += 1
-
-        # 5. Unlock grades (Grade)
         if unlock_grades:
-            for k, item in self.data_map.items():
-                if k.endswith("Grade") and item.get("val") != "True":
+            for song in (catalog.get("songs", {}) or {}).values():
+                stem = self.grade_key_title(song.get("title") or "")
+                if not stem:
+                    continue
+                if self._write_entry(stem + "INSGrade", "True"):
+                    counts["grades"] += 1
+                diffs = song.get("difficulties", {}) or {}
+                avail = song.get("available_diffs", []) or []
+                if "AT" in diffs or "AT" in avail:
+                    if self._write_entry(stem + "ATSGrade", "True"):
+                        counts["grades"] += 1
+            for k, item in list(self.data_map.items()):
+                if k.endswith("SGrade") and str(item.get("val")).lower() != "true":
                     item["val"] = "True"
                     counts["grades"] += 1
-
-            for song in catalog.get("songs", {}).values():
-                title = song.get("title", "")
-                if title:
-                    if _ensure_entry(f"{title}INSGrade", "True"):
-                        counts["grades"] += 1
-                    diffs = song.get("difficulties", {})
-                    avail = song.get("available_diffs", [])
-                    if "AT" in diffs or "AT" in avail:
-                        if _ensure_entry(f"{title}ATSGrade", "True"):
-                            counts["grades"] += 1
 
         self.modified = True
         return counts
@@ -1079,17 +1395,55 @@ class PhigrosSave:
             return True
         return False
 
+    # A PlayerPrefs file Unity will adopt needs its own version marker. A
+    # save reconstructed from a cloud package has no such entry -- the
+    # cloud format stores only records, keys, settings, user and progress
+    # -- so an XML written from one lacked every Unity-internal field and
+    # the game treated the file as unreadable and started a new save.
+    UNITY_VERSION_KEY = "__UNITY_PLAYERPREFS_VERSION__"
+    UNITY_VERSION_VALUE = "1"
+
+    def missing_local_scaffolding(self) -> List[str]:
+        """
+        Unity/Phigros-internal keys absent from the current data_map.
+
+        Only meaningful for a save that did not come from a local XML: a
+        cloud package cannot carry these, so an XML exported from one is
+        not a drop-in replacement for the on-device file.
+        """
+        expected = [
+            self.UNITY_VERSION_KEY,
+            "Screenmanager Resolution Width",
+            "Screenmanager Resolution Height",
+            "Screenmanager Fullscreen mode",
+            "NeedUpdateSongsData",
+        ]
+        return [k for k in expected if k not in self.data_map]
+
     def export_xml(self) -> bytes:
         """
-        Serializes all current data into Phigros PlayerPrefs encrypted XML byte string.
+        Serializes all current data into Phigros PlayerPrefs encrypted XML.
+
+        Written by hand rather than through ElementTree/minidom so the
+        output matches Android's FastXmlSerializer byte for byte: minidom
+        emits `value="1"/>` where Android writes `value="1" />`, which made
+        every export differ from the original even with nothing modified.
+        An unmodified save now round-trips to an identical file, so any
+        difference the game sees is a real edit and not formatting noise.
         """
-        root = ET.Element("map")
-        # To maintain fidelity, we write all items in data_map
+        esc_attr = {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}
+        esc_text = {"&": "&amp;", "<": "&lt;", ">": "&gt;"}
+
+        def _esc(value: str, table: Dict[str, str]) -> str:
+            return "".join(table.get(ch, ch) for ch in value)
+
+        parts = ["<?xml version='1.0' encoding='utf-8' standalone='yes' ?>", "<map>"]
         for item in self.data_map.values():
             tag = item.get("tag", "string")
             name = item["name"]
             val = str(item.get("val", ""))
             is_enc = item.get("is_enc", True)
+
 
             if tag == "string":
                 if is_enc:
@@ -1098,30 +1452,28 @@ class PhigrosSave:
                 else:
                     enc_name = quote(name, safe="").replace("/", "%2F")
                     enc_val = val
-                elem = ET.SubElement(root, "string", {"name": enc_name})
-                elem.text = enc_val
+                parts.append('    <string name="%s">%s</string>'
+                             % (_esc(enc_name, esc_attr), _esc(enc_val, esc_text)))
             elif tag == "int":
                 enc_name = quote(name, safe="").replace("/", "%2F")
-                ET.SubElement(root, "int", {"name": enc_name, "value": val})
+                parts.append('    <int name="%s" value="%s" />'
+                             % (_esc(enc_name, esc_attr), _esc(val, esc_attr)))
             else:
                 enc_name = quote(name, safe="").replace("/", "%2F")
-                elem = ET.SubElement(root, tag, {"name": enc_name})
-                elem.text = val
+                parts.append("    <%s name=\"%s\">%s</%s>"
+                             % (tag, _esc(enc_name, esc_attr), _esc(val, esc_text), tag))
 
-        xml_declaration = "<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n"
-        body = ET.tostring(root, encoding="utf-8").decode("utf-8")
-        # Format with clean indentation
-        from xml.dom import minidom
-        dom = minidom.parseString(body)
-        pretty_xml = dom.toprettyxml(indent="    ")
-        # Replace minidom header with the exact Unity standalone header
-        lines = pretty_xml.splitlines()
-        if lines and lines[0].startswith("<?xml"):
-            lines[0] = "<?xml version='1.0' encoding='utf-8' standalone='yes' ?>"
-        else:
-            lines.insert(0, "<?xml version='1.0' encoding='utf-8' standalone='yes' ?>")
-        result = "\n".join(lines) + "\n"
-        return result.encode("utf-8")
+        # Unity refuses to adopt a PlayerPrefs file without its version
+        # marker and starts a fresh save instead. A local XML always has
+        # one (and it is emitted above, in its original position, so an
+        # untouched save stays byte-identical); a cloud-derived save never
+        # does, so it is appended here rather than silently omitted.
+        if self.UNITY_VERSION_KEY not in self.data_map:
+            parts.append('    <int name="%s" value="%s" />'
+                         % (self.UNITY_VERSION_KEY, self.UNITY_VERSION_VALUE))
+
+        parts.append("</map>")
+        return ("\n".join(parts) + "\n").encode("utf-8")
 
     def export_json(self) -> str:
         """

@@ -276,10 +276,26 @@ def parse_apk(apk_path_or_bytes) -> Tuple[Dict[str, Any], Dict[str, int]]:
     merged_illust = list(set(existing_db.get("illustration_keys", []) + illustration_keys))
     merged_avatars = list(set(existing_db.get("avatars", []) + avatars))
 
-    # Collections merge by key
-    col_dict = {c["key"]: c for c in existing_db.get("collections", [])}
-    for c in collections:
-        col_dict[c["key"]] = c
+    # Collections merge, keyed on `key` alone. A collection `key` can carry
+    # several sub-items, but the save stores ONE entry per key whose value
+    # is how many sub-items are unlocked -- there is no per-subIndex entry.
+    # So `sub_index` is kept as the highest index seen (the sub-item count),
+    # matching the reference extractor. Keying on (key, subIndex) instead
+    # produced 503 phantom rows for 320 real collections.
+    col_dict = {}
+    for c in existing_db.get("collections", []) + collections:
+        k = c.get("key")
+        if not k:
+            continue
+        try:
+            sub = int(c.get("sub_index", 1) or 1)
+        except (TypeError, ValueError):
+            sub = 1
+        prev = col_dict.get(k)
+        if prev is None:
+            col_dict[k] = dict(c, sub_index=max(sub, 1))
+        else:
+            prev["sub_index"] = max(int(prev.get("sub_index", 1) or 1), sub)
     merged_collections = list(col_dict.values())
 
     full_db = {
