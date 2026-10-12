@@ -66,3 +66,4 @@ data/*.json.bak
 # Cloned reference repos
 Phi-LocalAction-python/
 phi_resource/
+Phi-CloudAction-python/

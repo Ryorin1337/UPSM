@@ -1234,9 +1234,12 @@ class PhigrosSave:
                 if partial is not None:
                     want = partial > 0
 
-            # Any downgrade -- a full lock, or a collection's count going
-            # down -- is impossible to express through the cloud upload.
-            if not can_lock:
+            # Any downgrade is impossible to express through the cloud
+            # upload -- EXCEPT a grade. The gameKey families merge with
+            # max(current, incoming), so clearing one is discarded by the
+            # server; grades ride in gameProgress as plain bits, which are
+            # written verbatim, so clearing one does survive the upload.
+            if not can_lock and not is_grade:
                 is_downgrade = not want
                 if is_collection and partial is not None:
                     is_downgrade = partial < self._as_count(self._entry_val(save_key))

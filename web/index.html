@@ -1593,19 +1593,6 @@
                 const match = /filename="?([^"]+)"?/.exec(disposition);
                 if (match) filename = match[1];
 
-                // A save rebuilt from a cloud package has no Unity-internal
-                // keys. The file is valid, but replacing the on-device save
-                // with it can make the game start fresh, so say so instead
-                // of handing over a download that looks interchangeable.
-                if (resp.headers.get("X-Upsm-Partial-Save")) {
-                    alert("注意：当前编辑的是云存档。\n\n" +
-                          "云存档格式不包含 Unity 内部字段（分辨率、版本标记等）与" +
-                          "挑战限制、章节解锁等本地专有数据，导出的 XML 缺少这些内容。\n\n" +
-                          "它可以用于备份与查看，但【不建议】直接替换手机上的存档文件，" +
-                          "否则游戏可能无法正确识别。\n\n" +
-                          "如需修改手机存档，请直接载入手机上的 XML 文件进行编辑。");
-                }
-
                 const blob = await resp.blob();
                 const objectUrl = URL.createObjectURL(blob);
                 const a = document.createElement("a");
@@ -2955,14 +2942,14 @@
                 }
                 // On a cloud save an unlocked item cannot be un-ticked,
                 // so the control is disabled rather than silently ignored.
-                const frozen = !unlockLockSupported && on;
+                const frozen = on && !canLockItem(it);
                 if (frozen) el.classList.add("frozen");
                 el.innerHTML = `
                     <input type="checkbox" ${on ? "checked" : ""} ${frozen ? "disabled" : ""}>
                     <span class="u-label">${escapeHtml(it.label)}</span>${sub}${badge}
                 `;
                 if (frozen) {
-                    el.title = (it.save_key || "") + "  —— 云存档无法取消解锁";
+                    el.title = (it.save_key || "") + "  —— 云存档下该类型无法取消解锁";
                 } else {
                     el.querySelector("input").onchange = (e) => {
                         toggleUnlock(it, e.target.checked);
@@ -2980,14 +2967,23 @@
             if (!el) return;
             if (unlockLockSupported) { el.style.display = "none"; return; }
             el.style.display = "block";
-            el.innerHTML = "☁️ <b>当前为云存档，只能添加解锁、无法取消解锁。</b>" +
-                "上传时云端按「取最大值」合并，取消的解锁会被服务器忽略。" +
-                "如需锁定，请改为载入手机本地的 XML 存档进行编辑。";
+            el.innerHTML = "☁️ <b>当前为云存档：歌曲、收藏品、曲绘、头像只能添加解锁。</b>" +
+                "云端按「取最大值」合并，这四类的取消解锁会被服务器忽略；" +
+                "课题等级（SGrade）不受此限制，可以正常取消。" +
+                "如需完全自由地锁定，请载入手机本地的 XML 存档。";
+        }
+
+        // A grade is stored in gameProgress as a plain bit and uploads
+        // verbatim, so it can be cleared even on a cloud save. The four
+        // gameKey families merge with max() and cannot.
+        function canLockItem(item) {
+            if (unlockLockSupported) return true;
+            return String((item && item.save_key) || "").endsWith("SGrade");
         }
 
         function toggleUnlock(item, want) {
-            if (!want && !unlockLockSupported) {
-                showToast("云存档无法取消解锁，请载入本地 XML 存档后操作", "error");
+            if (!want && !canLockItem(item)) {
+                showToast("云存档下歌曲/收藏品/曲绘/头像无法取消解锁，请载入本地 XML 存档", "error");
                 renderUnlockList();   // snap the checkbox back
                 return;
             }
@@ -3001,11 +2997,12 @@
         }
 
         function toggleVisibleUnlocks(want) {
-            if (!want && !unlockLockSupported) {
-                showToast("云存档无法取消解锁，请载入本地 XML 存档后操作", "error");
+            const items = visibleUnlockItems().filter(it => want || canLockItem(it));
+            if (!items.length) {
+                showToast("云存档下歌曲/收藏品/曲绘/头像无法取消解锁，请载入本地 XML 存档", "error");
                 return;
             }
-            visibleUnlockItems().forEach(it => {
+            items.forEach(it => {
                 if (!!it.unlocked === !!want) delete unlockPending[it.save_key];
                 else unlockPending[it.save_key] = !!want;
             });

@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from core.crypto import decrypt_cloud_bytes, encrypt_cloud_bytes
 from core import phi_struct as ps
 from core.apk_parser import load_database
+from core import local_bridge as lb
 
 # Entry order used by the game when it writes the archive.
 ENTRY_ORDER = ("gameKey", "gameProgress", "gameRecord", "settings", "user")
@@ -49,6 +50,20 @@ SLOT_PREFIXES = {
     SLOT_COLLECTION: "1key",
     SLOT_ILLUSTRATION: "2key",
     SLOT_AVATAR: "3key",
+}
+
+# Device-local Unity state a cloud save cannot carry. These are not game
+# progress: Unity and Phigros rewrite them from the real device on first
+# launch, so a neutral placeholder is safe where omitting them is not
+# (a PlayerPrefs file lacking the version marker is rejected outright and
+# the game starts a brand-new save).
+LOCAL_SCAFFOLDING = {
+    "__UNITY_PLAYERPREFS_VERSION__": "1",
+    "Screenmanager Resolution Width": "1920",
+    "Screenmanager Resolution Height": "1080",
+    "Screenmanager Fullscreen mode": "1",
+    "NeedUpdateSongsData": "0",
+    "setDspBuffer": "1",
 }
 
 DEFAULT_SETTINGS = {
@@ -579,10 +594,26 @@ def cloud_package_to_data_map(pkg: CloudSavePackage) -> Dict[str, Dict[str, Any]
     # gameProgress money / rank are editable in the existing currency panel.
     progress = pkg.parsed.get("gameProgress")
     if isinstance(progress, dict):
-        put("ChallengeModeRank", str(progress.get("challengeModeRank", 0)), encrypted=False)
         money = progress.get("money") or []
         for index in range(5):
             put("NumOfMoney%d" % index, str(money[index] if index < len(money) else 0))
+
+    # gameProgress / settings / user -> the local keys they stand for.
+    # Without this a cloud-derived save lost every chapter unlock, every
+    # S-grade AT unlock and all of settings, and the game silently
+    # rebuilt them at their defaults.
+    for name, value in lb.progress_to_local(progress).items():
+        put(name, value, encrypted=(name != "ChallengeModeRank"))
+    for name, value in lb.settings_to_local(pkg.parsed.get("settings")).items():
+        put(name, value)
+    for name, value in lb.user_to_local(pkg.parsed.get("user")).items():
+        put(name, value)
+
+    # Unity/device scaffolding. A PlayerPrefs file without these is not a
+    # file Unity will adopt, and the cloud format has no column for them,
+    # so they are emitted at safe defaults the game corrects on first run.
+    for name, value in LOCAL_SCAFFOLDING.items():
+        data_map.setdefault(name, {"tag": "int", "name": name, "val": value, "is_enc": False})
 
     return data_map
 
@@ -698,6 +729,28 @@ def apply_data_map_to_package(pkg: CloudSavePackage, data_map: Dict[str, Dict[st
                 except ValueError:
                     pass
             progress["money"] = money
+
+        # Chapter unlocks, S-grade AT flags and the other bit-packed
+        # progress fields the local save spells out one key per bit.
+        # Only families the local save actually has are rebuilt, so a
+        # partial local save never zeroes a chapter it simply omits.
+        try:
+            pkg.update_progress(lb.local_to_progress(data_map, progress))
+        except Exception:
+            pass
+
+    # settings / user: a local save stores these under different names
+    # (SEVolume, HitFXVolume, aPfCisOn, UserIconKeyName, ...). Without
+    # this an upload from a local save silently reset the player's
+    # options and name card to whatever the remote package held.
+    try:
+        pkg.update_settings(lb.local_to_settings(data_map))
+    except Exception:
+        pass
+    try:
+        pkg.update_user(lb.local_to_user(data_map))
+    except Exception:
+        pass
 
     return stats
 

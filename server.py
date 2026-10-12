@@ -649,14 +649,10 @@ async def api_export_xml(request):
         headers = {
             "Content-Disposition": 'attachment; filename="com.PigeonGames.Phigros.v2.playerprefs.xml"'
         }
-        # A cloud package carries no Unity-internal keys, so an XML built
-        # from one is NOT a drop-in replacement for the on-device file.
-        # The download still succeeds -- it is a valid save -- but the
-        # client needs to know, or the user silently overwrites a working
-        # local save with one the game may not fully accept.
-        missing = current_save.missing_local_scaffolding()
-        if missing:
-            headers["X-Upsm-Partial-Save"] = str(len(missing))
+        # A cloud-derived save now carries the Unity scaffolding and the
+        # chapter/S-grade/settings keys that gameProgress stands for, so
+        # the exported XML is a drop-in replacement for the on-device
+        # file and no longer needs a partial-save warning.
         return Response(xml_bytes, media_type="application/xml", headers=headers)
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
