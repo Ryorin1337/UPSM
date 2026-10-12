@@ -753,6 +753,307 @@
         }
 
         .hidden { display: none !important; }
+
+        /* ==================================================================
+           Portrait / narrow screens
+           ------------------------------------------------------------------
+           The layout was built for a desktop window and broke on a phone in
+           three distinct ways, each needing a different fix rather than a
+           blanket font shrink:
+
+             1. Grids with a fixed minimum wider than the screen. .song-grid
+                asked for minmax(460px, 1fr), so even a single column could
+                not fit a 390px viewport and the page scrolled sideways.
+             2. Fixed-column rows. .chart-row has seven fixed columns adding
+                up to ~470px before the title gets a pixel; squeezing them
+                further makes every number unreadable, so below 720px the row
+                becomes two lines instead.
+             3. Dialogs sized for a mouse. 20px of overlay padding plus 24px
+                of content padding wastes a quarter of a narrow screen, and
+                a dialog taller than the viewport had no way to scroll.
+
+           Touch targets are kept at >=40px tall, and inputs at >=16px font
+           so iOS Safari does not zoom the page when one is focused.
+           ================================================================== */
+
+        @media (max-width: 720px) {
+            body {
+                padding: 12px;
+            }
+
+            /* Header: stack, and let the title wrap instead of overflowing. */
+            header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+                padding: 14px 16px;
+            }
+
+            .header-title {
+                gap: 10px;
+            }
+
+            .header-title h1 {
+                font-size: 17px;
+                line-height: 1.25;
+            }
+
+            .header-title p {
+                font-size: 12px;
+            }
+
+            .logo-badge {
+                font-size: 16px;
+                padding: 5px 10px;
+                flex-shrink: 0;
+            }
+
+            /* A dozen toolbar buttons do not belong in a wrapped row on a
+               phone: two per line keeps every label readable and every tap
+               target full width. */
+            .header-actions {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+
+            .header-actions .btn {
+                width: 100%;
+                justify-content: center;
+                text-align: center;
+                padding: 10px 8px;
+                font-size: 12px;
+                min-height: 40px;
+                line-height: 1.2;
+            }
+
+            /* Stats: two per row reads better than auto-fit's cramped three. */
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+                margin-bottom: 14px;
+            }
+
+            .stat-card {
+                padding: 10px 12px;
+            }
+
+            .stat-val {
+                font-size: 17px;
+            }
+
+            .controls-bar {
+                padding: 12px;
+                gap: 10px;
+                margin-bottom: 16px;
+            }
+
+            .search-box {
+                min-width: 0;
+                flex: 1 1 100%;
+            }
+
+            /* 16px keeps iOS Safari from zooming in on focus. */
+            .search-box input,
+            .controls-bar select,
+            .controls-bar input {
+                font-size: 16px;
+            }
+
+            /* One column, and no 460px floor that the screen cannot meet. */
+            .song-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .song-card {
+                padding: 14px;
+                gap: 12px;
+            }
+
+            /* The card header puts the title group and the song-id pill on
+               one flex line; on a phone the pill has nowhere to go, so it
+               drops below the title instead of squeezing it. */
+            .song-header {
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            .song-id-pill {
+                align-self: flex-start;
+                max-width: 100%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            /* Five difficulty tabs in one flex row leave ~60px each, which
+               is not enough for the name, the constant and the rating badge
+               stacked inside. Two rows of wrapped tabs are readable. */
+            .diff-tabs {
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+
+            .diff-tab {
+                flex: 1 1 calc(33.333% - 4px);
+                min-width: 0;
+                padding: 7px 4px;
+            }
+
+            /* The editor row is a non-wrapping flex of two number inputs
+               plus the FC checkbox -- the single worst offender on a narrow
+               screen. Stack it. */
+            .editor-row {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+
+            .input-group input[type="number"],
+            .input-group input[type="text"] {
+                font-size: 16px;
+                padding: 9px 10px;
+            }
+
+            /* The top margin only existed to align with a label on the same
+               flex line; stacked, it just adds a gap. */
+            .fc-checkbox {
+                margin-top: 0;
+                min-height: 40px;
+            }
+
+            .editor-presets {
+                gap: 6px;
+            }
+
+            /* Preset buttons are tap targets, not dense desktop chips. */
+            .preset-btn {
+                flex: 1 1 calc(50% - 6px);
+                min-height: 34px;
+                font-size: 11px;
+                padding: 6px 8px;
+            }
+
+            /* Seven fixed columns cannot fit, so the row wraps to two lines:
+               rank + difficulty + title on the first, the numbers on the
+               second. The cells are addressed by position because the
+               difficulty cell is a bare <span> with no class of its own, and
+               the rule is !important because the "potential" list sets
+               grid-template-columns inline, which otherwise wins. */
+            .chart-row {
+                grid-template-columns: 38px 40px minmax(0, 1fr) !important;
+                gap: 6px 8px !important;
+                padding: 10px 12px;
+                font-size: 12px;
+            }
+
+            /* 1 rank | 2 difficulty | 3 title stay on the first line. */
+            .chart-row > :nth-child(1) { grid-column: 1; }
+            .chart-row > :nth-child(2) { grid-column: 2; }
+            .chart-row > :nth-child(3) { grid-column: 3; }
+
+            /* Everything after the title shares the full second line. */
+            .chart-row > :nth-child(n + 4) {
+                grid-column: 1 / -1;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                flex-wrap: wrap;
+            }
+
+            .chart-row .c-score { display: none; }
+
+            .chart-row .c-const::before { content: "定数 "; color: var(--text-muted); }
+            .chart-row .c-acc::before   { content: "ACC "; color: var(--text-muted); }
+            .chart-row .c-rks::before   { content: "RKS "; color: var(--text-muted); }
+
+            /* Dialogs: use the screen, and always allow scrolling. */
+            .modal-overlay {
+                padding: 8px;
+                align-items: flex-start;
+            }
+
+            .modal-content {
+                max-width: 100% !important;
+                width: 100%;
+                max-height: 94vh !important;
+                overflow-y: auto;
+                padding: 16px;
+                gap: 14px;
+                margin: 8px 0;
+            }
+
+            .modal-header h2 {
+                font-size: 16px;
+            }
+
+            /* A 44px target is the smallest comfortable tap area. */
+            .close-btn {
+                font-size: 24px;
+                padding: 4px 8px;
+                min-width: 44px;
+                min-height: 44px;
+            }
+
+            .modal-body input,
+            .modal-body select,
+            .modal-body textarea {
+                font-size: 16px;
+            }
+
+            /* Inside a dialog the row is tighter still. */
+            #analysis-modal .chart-row {
+                grid-template-columns: 34px 38px minmax(0, 1fr) !important;
+                padding: 8px 10px;
+                gap: 5px 8px !important;
+            }
+
+            /* One unlock item per row: 230px columns plus the dialog's own
+               padding overflowed a narrow screen. */
+            #unlock-list {
+                grid-template-columns: 1fr;
+            }
+
+            /* The analysis dialog builds its bar charts in JS with desktop
+               column widths inline, so they are narrowed here by position
+               rather than by a class they do not carry. */
+            #analysis-body .chart-list ~ div [style*="grid-template-columns"],
+            #analysis-body > div > div[style*="grid-template-columns"] {
+                grid-template-columns: 52px 1fr 46px 60px !important;
+                gap: 6px !important;
+                font-size: 11px !important;
+            }
+
+            /* Toasts span the width instead of sliding in from a side that
+               is only a few hundred pixels wide. */
+            #toast-container {
+                left: 12px;
+                right: 12px;
+                bottom: 12px;
+            }
+
+            .toast {
+                width: auto;
+                max-width: 100%;
+            }
+        }
+
+        /* Very narrow phones (<=380px): the two-up button grid and the stats
+           pair stop being comfortable, so both go single file. */
+        @media (max-width: 380px) {
+            .header-actions {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .chart-row {
+                grid-template-columns: 32px 36px minmax(0, 1fr) !important;
+                font-size: 11.5px;
+            }
+        }
     </style>
 </head>
 <body>
