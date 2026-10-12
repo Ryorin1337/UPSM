@@ -903,9 +903,13 @@
                         </p>
                     </div>
                 </div>
-                <button class="close-btn" onclick="closeModal('apk-modal')">&times;</button>
+                <button class="close-btn" onclick="dismissApkModal()">&times;</button>
             </div>
             <div class="modal-body">
+                <div id="apk-first-run-banner" style="display: none; background: rgba(255, 171, 64, 0.10); border: 1px solid rgba(255, 171, 64, 0.35); border-radius: var(--radius-md); padding: 12px 16px; font-size: 13px; line-height: 1.6; color: #ffd180;">
+                    ✨ <b>欢迎使用 UPSM！检测到本地尚未导入曲库数据。</b><br>
+                    导入后才能显示曲名、收藏品、曲绘与头像名称，并编辑未游玩曲目。现在导入只需一次，之后会一直保存在本地。
+                </div>
                 <div style="background: rgba(0, 229, 255, 0.06); border: 1px solid rgba(0, 229, 255, 0.2); border-radius: var(--radius-md); padding: 14px 16px; font-size: 13px; line-height: 1.6; color: var(--text-primary);">
                     <div style="font-weight: 700; color: var(--accent-cyan); margin-bottom: 4px;">💡 为什么需要 APK？（保护版权说明）</div>
                     为保护游戏原开发商著作权，<b>本项目不内置任何游戏专有数据库文件</b>。<br>
@@ -1459,16 +1463,29 @@
             document.getElementById(id).style.display = "flex";
         }
 
-        function openApkModal() { 
+        // Set when the user closes the APK dialog, so the launch prompt
+        // does not reopen it during this page view. Deliberately not
+        // persisted: a missing catalog is a real problem on every launch.
+        let apkPromptDismissed = false;
+
+        function openApkModal(isFirstRun) { 
             const progressContainer = document.getElementById("apk-progress-container");
             if (progressContainer) {
                 progressContainer.style.display = "none";
                 progressContainer.classList.add("hidden");
             }
+            // The welcome banner only belongs on the launch prompt, not
+            // when the user opened this from the toolbar themselves.
+            const banner = document.getElementById("apk-first-run-banner");
+            if (banner) banner.style.display = isFirstRun ? "block" : "none";
             openModal("apk-modal"); 
         }
         function dismissApkModal() {
-            localStorage.setItem("phigros_apk_onboarded", "true");
+            // Suppress the prompt for THIS page view only. Persisting it
+            // meant a user who closed the dialog once was never prompted
+            // again, even with no catalog -- every catalog-dependent
+            // feature then failed with no explanation of why.
+            apkPromptDismissed = true;
             closeModal("apk-modal");
         }
         async function confirmClearDatabase() {
@@ -1481,6 +1498,10 @@
                 const data = await res.json();
                 if (data.status === "ok") {
                     showToast(data.message, "success");
+                    // Clearing the catalog is an explicit "I want to
+                    // re-import" action, so an earlier dismissal should
+                    // not keep the prompt suppressed.
+                    apkPromptDismissed = false;
                     await fetchStatus();
                     await fetchSongs();
                 } else {
@@ -2427,7 +2448,6 @@
                 const data = await res.json();
                 if (data.status === "ok") {
                     showToast(data.message, "success");
-                    localStorage.setItem("phigros_apk_onboarded", "true");
                     await fetchStatus();
                     await fetchSongs();
                     if (progressText) progressText.innerText = "✅ " + data.message;
@@ -2499,7 +2519,6 @@
                 const data = await res.json();
                 if (data.status === "ok") {
                     showToast(data.message, "success");
-                    localStorage.setItem("phigros_apk_onboarded", "true");
                     await fetchStatus();
                     await fetchSongs();
                     if (progressText) progressText.innerText = "✅ " + data.message;
@@ -2567,9 +2586,6 @@
                         const apk = data.apk_status;
                         const hasDb = !!apk.has_database;
                         window.serverHasDatabase = hasDb;
-                        if (hasDb) {
-                            localStorage.setItem("phigros_apk_onboarded", "true");
-                        }
                         const btnTextEl = document.getElementById("btn-apk-status-text");
                         if (btnTextEl) {
                             btnTextEl.innerText = hasDb ? `APK 曲库 (${apk.total_songs}首)` : `APK 曲库导入/更新`;
@@ -3803,9 +3819,16 @@
         window.addEventListener("DOMContentLoaded", async () => {
             await fetchStatus();
             await fetchSongs();
-            const hasDb = window.serverHasDatabase || (summaryData && summaryData.total_songs > 0);
-            if (!hasDb && !localStorage.getItem("phigros_apk_onboarded")) {
-                openApkModal();
+            // The catalog is what song titles, collections, illustrations
+            // and avatars are resolved from, so without it most of the
+            // editor silently has nothing to show. Prompt for the APK on
+            // every launch until one has actually been parsed -- the old
+            // check also accepted the SAVE's song count, which comes from
+            // the save file and says nothing about the catalog, and a
+            // localStorage flag set on dismissal meant closing the dialog
+            // once suppressed the prompt permanently.
+            if (!window.serverHasDatabase && !apkPromptDismissed) {
+                openApkModal(true);
             }
         });
     </script>
