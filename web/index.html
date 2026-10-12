@@ -383,8 +383,29 @@
             gap: 12px;
         }
 
+        /* Same length limit as the list's .c-title: every text line in the
+           card header is single-line and ends in an ellipsis rather than
+           pushing the card wider. */
         .song-title-group {
+            flex: 1 1 auto;
+            min-width: 0;
+            max-width: 100%;
             overflow: hidden;
+        }
+
+        .song-title-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .song-title-line > .song-title {
+            min-width: 0;
+        }
+
+        .song-title-line > .song-status {
+            flex-shrink: 0;
         }
 
         .song-title {
@@ -412,6 +433,10 @@
             padding: 3px 8px;
             border-radius: 4px;
             white-space: nowrap;
+            flex-shrink: 0;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* Difficulty Tab Selector */
@@ -813,7 +838,7 @@
                target full width. */
             .header-actions {
                 display: grid;
-                grid-template-columns: 1fr 1fr;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
                 gap: 8px;
             }
 
@@ -829,7 +854,7 @@
 
             /* Stats: two per row reads better than auto-fit's cramped three. */
             .stats-grid {
-                grid-template-columns: 1fr 1fr;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
                 gap: 8px;
                 margin-bottom: 14px;
             }
@@ -860,23 +885,71 @@
                 font-size: 16px;
             }
 
-            /* One column, and no 460px floor that the screen cannot meet. */
+            /* One column, and no 460px floor that the screen cannot meet.
+               minmax(0, 1fr) rather than 1fr: a bare 1fr is minmax(auto, 1fr),
+               and that `auto` minimum is what let a card outgrow the page. */
             .song-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: minmax(0, 1fr);
                 gap: 12px;
             }
 
             .song-card {
                 padding: 14px;
                 gap: 12px;
+                min-width: 0;
+            }
+
+            /* The card was still wider than the toolbar because a long song
+               title escaped its box. .song-title is nowrap + ellipsised, but
+               overflow:hidden does NOT shrink an element's min-content width
+               -- for nowrap text the min-content width is the whole string --
+               and a flex item defaults to min-width:auto, so that width
+               propagated all the way up and widened the grid track. A name
+               like "atruthseekerCommunicationwithUtopiawillbelost" was enough
+               to push the card past the viewport. min-width:0 on every link in
+               the chain caps the min-content contribution and lets the
+               ellipsis actually do its job. */
+            .song-header,
+            .song-title-group,
+            .song-title-group > div,
+            .song-title,
+            .song-artist,
+            .song-id-pill {
+                min-width: 0;
+            }
+
+            .diff-tabs,
+            .diff-editor,
+            .editor-presets,
+            .editor-row,
+            .input-group {
+                min-width: 0;
+            }
+
+            /* Number inputs carry an intrinsic ~20-character width. Stacked in
+               a column they stretch, but their intrinsic width still floors the
+               container, so cap it explicitly. */
+            .input-group input[type="number"],
+            .input-group input[type="text"] {
+                width: 100%;
+                min-width: 0;
             }
 
             /* The card header puts the title group and the song-id pill on
                one flex line; on a phone the pill has nowhere to go, so it
                drops below the title instead of squeezing it. */
+            /* align-items must become stretch: the base rule's flex-start,
+               once the axis is vertical, sizes the title group to its
+               content -- the full unwrapped title -- so a long title made
+               the group wider than the card and the ellipsis never fired. */
             .song-header {
                 flex-direction: column;
+                align-items: stretch;
                 gap: 6px;
+            }
+
+            .song-title-group {
+                width: 100%;
             }
 
             .song-id-pill {
@@ -3719,14 +3792,14 @@
             const currentRec = song.diffs[activeDiff] || { score: 0, acc: 0, c: 0, fc: false, rating: "未游玩", has_record: false };
 
             const statusBadge = song.has_records 
-                ? '<span style="font-size:10px; background:rgba(0,230,118,0.12); color:var(--color-s); border:1px solid rgba(0,230,118,0.3); padding:2px 7px; border-radius:4px; font-weight:700;">已记录</span>' 
-                : '<span style="font-size:10px; background:rgba(255,255,255,0.06); color:var(--text-muted); border:1px solid rgba(255,255,255,0.08); padding:2px 7px; border-radius:4px; font-weight:600;">未游玩</span>';
+                ? '<span class="song-status" style="font-size:10px; background:rgba(0,230,118,0.12); color:var(--color-s); border:1px solid rgba(0,230,118,0.3); padding:2px 7px; border-radius:4px; font-weight:700;">已记录</span>' 
+                : '<span class="song-status" style="font-size:10px; background:rgba(255,255,255,0.06); color:var(--text-muted); border:1px solid rgba(255,255,255,0.08); padding:2px 7px; border-radius:4px; font-weight:600;">未游玩</span>';
 
             // Song Header
             const header = `
                 <div class="song-header">
                     <div class="song-title-group">
-                        <div style="display:flex; align-items:center; gap:8px;">
+                        <div class="song-title-line">
                             <div class="song-title" title="${song.title}">${song.title}</div>
                             ${statusBadge}
                         </div>
