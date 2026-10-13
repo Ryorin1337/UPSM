@@ -288,12 +288,34 @@
             transition: border-color 0.15s, background 0.15s;
         }
 
+        /* The main ranking list shows the chart's rating badge in its own
+           column. The analysis dialog reuses .chart-row with its own
+           templates, so the eighth column lives behind a modifier class
+           instead of on the shared base rule. */
+        .chart-row.with-rating {
+            grid-template-columns: 56px 48px minmax(0, 1fr) 58px 70px 92px 110px 92px;
+        }
+
+        .chart-row .c-rating {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        /* The badge is a chip, never a wrapped two-line block. */
+        .chart-row .c-rating .diff-badge {
+            white-space: nowrap;
+        }
+
         /* Narrow screens: drop the score column before the title suffers. */
         @media (max-width: 860px) {
             .chart-row {
                 grid-template-columns: 44px 44px minmax(0, 1fr) 58px 80px 78px;
             }
             .chart-row .c-score { display: none; }
+            .chart-row.with-rating {
+                grid-template-columns: 44px 44px minmax(0, 1fr) 54px 58px 80px 78px;
+            }
         }
 
         .chart-row:hover {
@@ -3076,6 +3098,7 @@
         }
 
         function getRatingBadgeClass(rating) {
+            if (!rating) return "badge-none";
             if (rating === "φ") return "badge-phi";
             if (rating === "V (FC)") return "badge-v_fc";
             if (rating.startsWith("V")) return "badge-v";
@@ -3085,6 +3108,18 @@
             if (rating.startsWith("C")) return "badge-c";
             if (rating.startsWith("False")) return "badge-f";
             return "badge-none";
+        }
+
+        /**
+         * Label for the ranking list's badge, which shares the card's badge
+         * colours but not its room: the card can spell "V (FC)" and "False",
+         * the list column shows the same grade in its shortest form. Only the
+         * text changes -- the class (and so the colour) is the card's.
+         */
+        function getListRatingText(rating) {
+            if (!rating) return "未游玩";
+            if (rating === "False") return "F";
+            return rating.replace(/\s*\(FC\)$/, "");
         }
 
         // Render song cards
@@ -3702,7 +3737,7 @@
                         constant: rec.constant || 0,
                         acc: rec.acc || 0,
                         score: rec.score || 0,
-                        rating: rec.rating,
+                        rating: rec.rating || "未游玩",
                         rks: rec.rks || 0
                     });
                 });
@@ -3733,16 +3768,21 @@
             const frag = document.createDocumentFragment();
             rows.forEach((r, i) => {
                 const row = document.createElement("div");
-                row.className = "chart-row";
+                row.className = "chart-row with-rating";
                 row.title = "点击在曲目卡片中编辑该成绩";
                 row.onclick = () => focusChart(r.songId, r.diff);
 
                 const constText = r.constant > 0 ? r.constant.toFixed(1) : "—";
                 const rksText = r.constant > 0 ? r.rks.toFixed(4) : "—";
+                // The same badge the song card's difficulty tab renders -- same
+                // class, so the same colour -- with the list's shorter label.
+                const badgeClass = getRatingBadgeClass(r.rating);
+                const badgeText = getListRatingText(r.rating);
                 row.innerHTML = `
                     <span class="c-rank">#${i + 1}</span>
                     <span><span class="diff-tag diff-${r.diff}">${r.diff}</span></span>
                     <span class="c-title">${escapeHtml(r.title)}<span class="c-artist">${escapeHtml(r.artist || "")}</span></span>
+                    <span class="c-rating"><span class="diff-badge ${badgeClass}" title="评级 ${escapeHtml(r.rating)}">${escapeHtml(badgeText)}</span></span>
                     <span class="c-const">${constText}</span>
                     <span class="c-acc">${r.acc.toFixed(2)}%</span>
                     <span class="c-score">${r.score.toLocaleString()}</span>
